@@ -9,6 +9,19 @@ import { Icon } from "@/components/ui";
 type Shared = Record<string, unknown>;
 type Verify = { status: "valid" | "invalid" | "not_configured" | "pending"; reason?: string };
 
+const SECRET = /token|secret|password|passwd|api_?key|credential/i;
+
+/** Masque les valeurs sensibles avant affichage (aucun caractère conservé). */
+function maskSecrets(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(maskSecrets);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [k, SECRET.test(k) && v != null && typeof v !== "object" ? "••••••••" : maskSecrets(v)]),
+    );
+  }
+  return value;
+}
+
 function parentOrigin(parentUrl: string | null) {
   try {
     if (parentUrl) return new URL(parentUrl).origin;
@@ -172,7 +185,7 @@ export default function OneStockContext() {
                 {urlContext.map(([k, v]) => (
                   <div key={k} style={{ display: "contents" }}>
                     <dt className="mono">{k}</dt>
-                    <dd className="mono">{v}</dd>
+                    <dd className="mono">{SECRET.test(k) ? "••••••••" : v}</dd>
                   </div>
                 ))}
               </dl>
@@ -183,7 +196,7 @@ export default function OneStockContext() {
           <div>
             <h3>{t("ctx.sharedData")}</h3>
             {shared ? (
-              <pre className="code">{JSON.stringify(shared, null, 2)}</pre>
+              <pre className="code">{JSON.stringify(maskSecrets(shared), null, 2)}</pre>
             ) : (
               <p className="secondary">{inIframe ? t("ctx.pending") : t("ctx.openedOutside")}</p>
             )}

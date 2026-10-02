@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { clearLogs } from "@/lib/apiLogs";
 import { randomUUID } from "node:crypto";
+import { encryptSecret, isSecretKey, MissingKeyError } from "@/lib/secrets";
 import { ensureSchema, getSql, nameKey, type CatalogInjectionPoint } from "@/lib/db";
 
 function text(form: FormData, key: string) {
@@ -106,18 +107,37 @@ export async function saveSetting(form: FormData) {
     redirect(reopen("required"));
   }
 
+  // Valeur sensible (onestock_token…) : toujours chiffrée ; vide en modification = valeur actuelle conservée.
+  const secret = isSecretKey(original ? JSON.parse(original).key : key);
+  if (secret && !value && !original) redirect(reopen("required"));
+  let stored = value;
+  if (secret && value) {
+    try {
+      stored = encryptSecret(value);
+    } catch (e) {
+      redirect(reopen(e instanceof MissingKeyError ? "no_encryption_key" : (e as Error).message));
+    }
+  }
+
   const sql = getSql();
   try {
     if (original) {
       const o = JSON.parse(original) as { key: string; site_id: string; extension_id: string; environment: string };
-      await sql`
-        UPDATE settings SET value = ${value}, scope = ${scope}, updated_at = now()
-        WHERE key = ${o.key} AND site_id = ${o.site_id}
-          AND extension_id = ${o.extension_id} AND environment = ${o.environment}`;
+      if (secret && !value) {
+        await sql`
+          UPDATE settings SET scope = ${scope}, updated_at = now()
+          WHERE key = ${o.key} AND site_id = ${o.site_id}
+            AND extension_id = ${o.extension_id} AND environment = ${o.environment}`;
+      } else {
+        await sql`
+          UPDATE settings SET value = ${stored}, scope = ${scope}, updated_at = now()
+          WHERE key = ${o.key} AND site_id = ${o.site_id}
+            AND extension_id = ${o.extension_id} AND environment = ${o.environment}`;
+      }
     } else {
       await sql`
         INSERT INTO settings (key, value, site_id, extension_id, environment, scope, updated_at)
-        VALUES (${key}, ${value}, ${siteId}, ${extensionId}, ${environment}, ${scope}, now())`;
+        VALUES (${key}, ${stored}, ${siteId}, ${extensionId}, ${environment}, ${scope}, now())`;
     }
   } catch (e) {
     const code = (e as { code?: string }).code;

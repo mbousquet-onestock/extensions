@@ -106,8 +106,9 @@ export async function clearLogs(siteId?: string) {
 
 const SECRET_KEY = /token|secret|password|passwd|api_?key|authorization|credential|signature/i;
 
-function maskString(v: string) {
-  return v.length <= 3 ? "••••" : `${v.slice(0, 3)}••••`;
+// Aucun caractère d'un secret n'est conservé.
+function maskString(_v: string) {
+  return "••••••••";
 }
 
 export function maskSecrets(value: unknown): unknown {

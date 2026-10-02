@@ -1,6 +1,10 @@
 import { getSql } from "@/lib/db";
+import { isEncrypted, isSecretKey } from "@/lib/secrets";
 
 export type Setting = {
+  /** Setting sensible : `value` est toujours vide côté interface (jamais lue ni affichée). */
+  secret?: boolean;
+  encrypted?: boolean;
   key: string;
   value: string;
   updated_at: Date;
@@ -39,7 +43,10 @@ export async function getSettings({ extensionId, siteId }: { extensionId?: strin
      ORDER BY key, environment, site_id`,
     args,
   );
-  return rows as Setting[];
+  // Les valeurs sensibles ne quittent jamais cette fonction : seul leur état (chiffré ou non) est exposé.
+  return (rows as Setting[]).map((r) =>
+    isSecretKey(r.key) ? { ...r, value: "", secret: true, encrypted: isEncrypted(r.value) } : r,
+  );
 }
 
 /** Un setting « tous les sites » est remplacé s'il existe la même clé pour le site précis. */

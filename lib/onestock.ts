@@ -2,6 +2,7 @@ import http from "node:http";
 import https from "node:https";
 import { logApiCall } from "@/lib/apiLogs";
 import { getSql } from "@/lib/db";
+import { decryptSecret } from "@/lib/secrets";
 
 // ---------- Identifiants (table settings) ----------
 
@@ -36,7 +37,9 @@ export async function getCredentials(siteId: string, hint?: string | null): Prom
     return (candidates.find((r) => r.site_id === siteId) ?? candidates[0])?.value;
   };
   const apiRoot = pick("onestock_api_root");
-  const token = pick("onestock_token");
+  // Le token est stocké chiffré : il n'est déchiffré qu'ici, côté serveur, pour l'appel à l'API.
+  const stored = pick("onestock_token");
+  const token = stored ? decryptSecret(stored) : undefined;
   return apiRoot && token ? { apiRoot, token, environment } : null;
 }
 

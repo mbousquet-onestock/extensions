@@ -307,3 +307,4 @@ pre.code { margin: 6px 0 0; padding: 8px; background: var(--neutral-30); border-
 .point-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: var(--spacing-m); }
 .point-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-m); }
 .section-title { font-size: 14px; font-weight: 500; margin: 0; }
+.secret-value { display: inline-flex; align-items: center; gap: 8px; }

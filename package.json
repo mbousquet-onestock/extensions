@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "db:migrate": "node scripts/migrate.mjs"
+    "db:migrate": "node scripts/migrate.mjs",
+    "secrets:encrypt": "node scripts/encrypt-secrets.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",

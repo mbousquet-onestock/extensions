@@ -1,21 +1,25 @@
 import Link from "next/link";
 import { saveSetting } from "@/app/actions";
 import HiddenContext from "@/components/HiddenContext";
+import SettingKeyValue from "@/components/SettingKeyValue";
 import { Alert, Empty, Icon, Modal } from "@/components/ui";
 import { withContext } from "@/lib/context";
 import { formatDate, getT, type MessageKey } from "@/lib/i18n";
 import { isOverridden, isWildcard, type Setting } from "@/lib/settings";
 
-const SENSITIVE = /token|secret|password|passwd|api_key|credential/i;
-
-function Value({ row }: { row: Setting }) {
+function Value({ row, t }: { row: Setting; t: ReturnType<typeof getT> }) {
   const value = row.value ?? "";
-  if (SENSITIVE.test(row.key) && value) {
+  // Valeur sensible : jamais transmise à l'interface, seul son état de chiffrement est affiché.
+  if (row.secret) {
     return (
-      <details className="reveal">
-        <summary>••••••••</summary>
-        <pre className="code">{value}</pre>
-      </details>
+      <span className="secret-value">
+        <span className="mono">••••••••</span>
+        {row.encrypted ? (
+          <span className="badge badge-brand">{t("set.encrypted")}</span>
+        ) : (
+          <span className="badge badge-orange" title={t("set.notEncryptedHelp")}>{t("set.notEncrypted")}</span>
+        )}
+      </span>
     );
   }
   if (value.length > 80) {
@@ -75,11 +79,15 @@ export default function SettingsView({
       : undefined;
   const modalOpen = params.new === "1" || !!editing;
   const errorKey =
-    params.error === "required" || params.error === "duplicate" ? (`set.${params.error}` as MessageKey) : null;
+    params.error === "required" || params.error === "duplicate" || params.error === "no_encryption_key"
+      ? (`set.${params.error}` as MessageKey)
+      : null;
+  const plain = rows.filter((r) => r.secret && !r.encrypted).length;
 
   return (
     <>
       {params.saved && <Alert type="success">{t("set.saved")}</Alert>}
+      {plain > 0 && <Alert type="danger">{t("set.plainWarning", { n: plain })}</Alert>}
       {params.error && !modalOpen && (
         <Alert type="danger">{errorKey ? t(errorKey) : t("common.dbError", { error: params.error })}</Alert>
       )}
@@ -138,7 +146,7 @@ export default function SettingsView({
                       <div className="primary-text mono">{row.key}</div>
                       {row.scope && <div className="tertiary-text">{row.scope}</div>}
                     </td>
-                    <td className="cell"><Value row={row} /></td>
+                    <td className="cell"><Value row={row} t={t} /></td>
                     <td className="nowrap">
                       {isWildcard(row.site_id) ? (
                         <span className="badge badge-grey">{t("set.allSites")}</span>
@@ -214,10 +222,17 @@ export default function SettingsView({
               )}
               {editing && <Alert type="neutral">{t("set.lockedHelp")}</Alert>}
               <div className="form-grid">
-                <label className="field full">
-                  <span className="field-label">{t("set.colKey")}</span>
-                  <input className="input mono" name="key" required defaultValue={editing?.key} readOnly={!!editing} autoFocus={!editing} />
-                </label>
+                <SettingKeyValue
+                  editing={!!editing}
+                  defaultKey={editing?.key ?? ""}
+                  defaultValue={editing?.secret ? "" : editing?.value ?? ""}
+                  labels={{
+                    key: t("set.colKey"),
+                    value: t("set.colValue"),
+                    secretHelp: t("set.secretHelp"),
+                    secretKeep: t("set.secretKeep"),
+                  }}
+                />
                 <label className="field">
                   <span className="field-label">{t("set.colSite")}</span>
                   <input
@@ -246,10 +261,6 @@ export default function SettingsView({
                   <datalist id="setting-envs">
                     {environments.map((e) => <option key={e} value={e} />)}
                   </datalist>
-                </label>
-                <label className="field full">
-                  <span className="field-label">{t("set.colValue")}</span>
-                  <textarea className="textarea" name="value" rows={4} defaultValue={editing?.value} autoFocus={!!editing} />
                 </label>
               </div>
             </div>

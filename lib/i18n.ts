@@ -195,6 +195,13 @@ const fr = {
   "form.iconHelp": "PNG, JPG ou GIF, 100 Ko maximum.",
   "form.iconTooBig": "Image trop lourde (100 Ko maximum).",
   "form.noPoints": "Aucun point d'injection.",
+  "set.encrypted": "Chiffré",
+  "set.notEncrypted": "Non chiffré",
+  "set.notEncryptedHelp": "Valeur enregistrée en clair : ré-enregistrez-la ou lancez npm run secrets:encrypt.",
+  "set.secretHelp": "Valeur sensible : chiffrée en base et jamais réaffichée.",
+  "set.secretKeep": "Laisser vide pour conserver la valeur actuelle",
+  "set.no_encryption_key": "Chiffrement impossible : la variable SETTINGS_ENCRYPTION_KEY n'est pas définie.",
+  "set.plainWarning": "{n} valeur(s) sensible(s) enregistrée(s) en clair : ré-enregistrez-les ou lancez npm run secrets:encrypt.",
 } as const;
 
 export type MessageKey = keyof typeof fr;
@@ -394,6 +401,13 @@ const en: Record<MessageKey, string> = {
   "form.iconHelp": "PNG, JPG or GIF, 100 KB max.",
   "form.iconTooBig": "Image too large (100 KB max).",
   "form.noPoints": "No injection point.",
+  "set.encrypted": "Encrypted",
+  "set.notEncrypted": "Not encrypted",
+  "set.notEncryptedHelp": "Value stored in clear text: save it again or run npm run secrets:encrypt.",
+  "set.secretHelp": "Sensitive value: encrypted in database and never displayed again.",
+  "set.secretKeep": "Leave empty to keep the current value",
+  "set.no_encryption_key": "Cannot encrypt: the SETTINGS_ENCRYPTION_KEY variable is not set.",
+  "set.plainWarning": "{n} sensitive value(s) stored in clear text: save them again or run npm run secrets:encrypt.",
 };
 
 const DICTIONARIES = { fr, en } as const;
