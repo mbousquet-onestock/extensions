@@ -2,7 +2,7 @@
 
 import { purgeLogs } from "../actions";
 
-export default function PurgeForm({ canFilterByDate }: { canFilterByDate: boolean }) {
+export default function PurgeForm({ canFilterByDate, context }: { canFilterByDate: boolean; context: string }) {
   return (
     <form
       action={purgeLogs}
@@ -15,6 +15,7 @@ export default function PurgeForm({ canFilterByDate }: { canFilterByDate: boolea
         if (!confirm(msg)) e.preventDefault();
       }}
     >
+      <input type="hidden" name="context" value={context} />
       {canFilterByDate && (
         <select name="older_than_days" defaultValue="">
           <option value="">Tous les logs</option>

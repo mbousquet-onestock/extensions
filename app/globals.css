@@ -69,3 +69,17 @@ button.link { border: none; background: none; padding: 0; color: var(--accent); 
 details summary { cursor: pointer; color: var(--accent); }
 pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-all; max-width: 480px; }
 .cell { max-width: 360px; overflow-wrap: anywhere; }
+.topbar nav a.active { font-weight: 600; text-decoration: underline; }
+.badge.err { color: var(--danger); background: var(--off-bg); }
+.context summary { list-style: none; gap: 16px; }
+.context summary::-webkit-details-marker { display: none; }
+.ctx-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 12px; }
+.ctx-grid h3 { font-size: 13px; margin: 0 0 6px; color: var(--muted); }
+.ctx-grid pre { max-width: none; }
+dl { margin: 0; }
+dl > div { display: flex; gap: 8px; }
+dt { color: var(--muted); min-width: 160px; }
+dd { margin: 0; overflow-wrap: anywhere; }
+h2 { font-size: 15px; margin: 0 0 12px; }
+.section-title { display: flex; justify-content: space-between; align-items: baseline; margin: 24px 0 8px; }
+.section-title h2 { margin: 0; }

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { ensureExtensionsTable, getSql } from "@/lib/db";
+import { ensureSchema, getSql } from "@/lib/db";
 
 function text(form: FormData, key: string) {
   return String(form.get(key) ?? "").trim();
@@ -12,33 +12,46 @@ export async function saveExtension(form: FormData) {
   const id = text(form, "id");
   const name = text(form, "name");
   const point = text(form, "installation_point");
-  const settingsUrl = text(form, "settings_url") || null;
-  const installed = form.get("installed") === "on";
+  const description = text(form, "description") || null;
   if (!id || !name || !point) return;
 
-  await ensureExtensionsTable();
+  await ensureSchema();
   await getSql()`
-    INSERT INTO extensions (id, name, installation_point, installed, settings_url)
-    VALUES (${id}, ${name}, ${point}, ${installed}, ${settingsUrl})
+    INSERT INTO extensions (id, name, installation_point, description)
+    VALUES (${id}, ${name}, ${point}, ${description})
     ON CONFLICT (id) DO UPDATE SET
       name = EXCLUDED.name,
       installation_point = EXCLUDED.installation_point,
-      installed = EXCLUDED.installed,
-      settings_url = EXCLUDED.settings_url,
+      description = EXCLUDED.description,
       updated_at = now()`;
   revalidatePath("/");
-}
-
-export async function toggleInstalled(form: FormData) {
-  const id = text(form, "id");
-  await getSql()`
-    UPDATE extensions SET installed = NOT installed, updated_at = now() WHERE id = ${id}`;
-  revalidatePath("/");
+  const back = text(form, "back");
+  if (back.startsWith("/")) redirect(back);
 }
 
 export async function deleteExtension(form: FormData) {
   const id = text(form, "id");
+  await ensureSchema();
   await getSql()`DELETE FROM extensions WHERE id = ${id}`;
+  revalidatePath("/");
+}
+
+export async function installExtension(form: FormData) {
+  const id = text(form, "id");
+  const siteId = text(form, "site_id");
+  if (!id || !siteId) return;
+  await ensureSchema();
+  await getSql()`
+    INSERT INTO site_extensions (site_id, extension_id) VALUES (${siteId}, ${id})
+    ON CONFLICT DO NOTHING`;
+  revalidatePath("/");
+}
+
+export async function uninstallExtension(form: FormData) {
+  const id = text(form, "id");
+  const siteId = text(form, "site_id");
+  await ensureSchema();
+  await getSql()`DELETE FROM site_extensions WHERE site_id = ${siteId} AND extension_id = ${id}`;
   revalidatePath("/");
 }
 
@@ -56,5 +69,7 @@ export async function purgeLogs(form: FormData) {
     deleted = rows[0].n;
   }
   revalidatePath("/logs");
-  redirect(`/logs?purged=${deleted}`);
+  const back = new URLSearchParams(text(form, "context"));
+  back.set("purged", String(deleted));
+  redirect(`/logs?${back}`);
 }

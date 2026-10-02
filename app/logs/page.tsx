@@ -1,38 +1,16 @@
-import { getSql } from "@/lib/db";
+import DataTable from "@/components/DataTable";
+import { contextParams, withContext } from "@/lib/context";
+import { getSql, tableColumns, type Row } from "@/lib/db";
 import PurgeForm from "./PurgeForm";
 
 export const dynamic = "force-dynamic";
 
 const PAGE_SIZES = [50, 100, 500];
 
-function formatValue(value: unknown) {
-  if (value === null || value === undefined) return <span className="sub">—</span>;
-  if (value instanceof Date) return value.toLocaleString("fr-FR");
-  if (typeof value === "object") {
-    const json = JSON.stringify(value, null, 2);
-    return (
-      <details>
-        <summary>JSON</summary>
-        <pre className="mono">{json}</pre>
-      </details>
-    );
-  }
-  const str = String(value);
-  if (str.length > 120) {
-    return (
-      <details>
-        <summary>{str.slice(0, 60)}…</summary>
-        <pre className="mono">{str}</pre>
-      </details>
-    );
-  }
-  return str;
-}
-
 export default async function LogsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; page?: string; size?: string; purged?: string }>;
+  searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const params = await searchParams;
   const q = (params.q ?? "").trim();
@@ -40,17 +18,13 @@ export default async function LogsPage({
   const page = Math.max(1, Number(params.page) || 1);
 
   let columns: string[] = [];
-  let rows: Record<string, unknown>[] = [];
+  let rows: Row[] = [];
   let total = 0;
   let error: string | null = null;
 
   try {
     const sql = getSql();
-    const cols = await sql`
-      SELECT column_name FROM information_schema.columns
-      WHERE table_name = 'api_logs' AND table_schema = current_schema()
-      ORDER BY ordinal_position`;
-    columns = cols.map((c) => c.column_name as string);
+    columns = await tableColumns("api_logs");
     if (columns.length === 0) throw new Error("La table api_logs n'existe pas (lancer npm run db:migrate).");
 
     const orderBy = columns.includes("created_at")
@@ -69,14 +43,13 @@ export default async function LogsPage({
       ),
     ]);
     total = (countRes as { n: number }[])[0].n;
-    rows = data as Record<string, unknown>[];
+    rows = data as Row[];
   } catch (e) {
     error = (e as Error).message;
   }
 
   const pages = Math.max(1, Math.ceil(total / size));
-  const href = (p: number) =>
-    `/logs?${new URLSearchParams({ ...(q && { q }), size: String(size), page: String(p) })}`;
+  const href = (p: number) => withContext("/logs", params, { ...(q && { q }), size: String(size), page: String(p) });
 
   return (
     <>
@@ -90,6 +63,7 @@ export default async function LogsPage({
 
       <div className="card row" style={{ justifyContent: "space-between" }}>
         <form className="row" method="get">
+          {[...contextParams(params)].map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
           <input name="q" placeholder="Rechercher (url, statut, contenu…)" defaultValue={q} size={32} />
           <select name="size" defaultValue={String(size)}>
             {PAGE_SIZES.map((s) => (
@@ -98,30 +72,12 @@ export default async function LogsPage({
           </select>
           <button type="submit">Rechercher</button>
         </form>
-        {!error && <PurgeForm canFilterByDate={columns.includes("created_at")} />}
+        {!error && (
+          <PurgeForm canFilterByDate={columns.includes("created_at")} context={contextParams(params).toString()} />
+        )}
       </div>
 
-      <div className="card table-wrap">
-        <table>
-          <thead>
-            <tr>{columns.map((c) => <th key={c}>{c}</th>)}</tr>
-          </thead>
-          <tbody>
-            {rows.map((row, i) => (
-              <tr key={String(row.id ?? i)}>
-                {columns.map((c) => (
-                  <td key={c} className="cell mono">{formatValue(row[c])}</td>
-                ))}
-              </tr>
-            ))}
-            {rows.length === 0 && !error && (
-              <tr>
-                <td colSpan={Math.max(1, columns.length)} className="sub">Aucun log.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      {!error && <DataTable columns={columns} rows={rows} empty="Aucun log." />}
 
       {pages > 1 && (
         <div className="row">
