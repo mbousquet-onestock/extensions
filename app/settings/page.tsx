@@ -1,5 +1,5 @@
-import SettingForm from "@/components/SettingForm";
-import SettingsTable, { environmentsOf, findEdited } from "@/components/SettingsTable";
+import SettingsView from "@/components/SettingsView";
+import { Alert } from "@/components/ui";
 import { getT } from "@/lib/i18n";
 import { getSettings, type Setting } from "@/lib/settings";
 
@@ -23,27 +23,21 @@ export default async function GeneralSettingsPage({
   }
 
   return (
-    <>
-      <h1>{t("set.generalTitle")}</h1>
-      <p className="sub">
-        {t("set.scopeGlobal")}
-        {siteId && <> · {t("set.forSite", { site: siteId })}</>}
-        {" "}· {t("set.count", { n: rows.length })}
-      </p>
-      {error && <p className="card error">{t("common.dbError", { error })}</p>}
-      {!error && (
-        <>
-          <SettingsTable rows={rows} params={search} path="/settings" showExtension />
-          <SettingForm
-            params={search}
-            path="/settings"
-            extensionId="*"
-            scope="global"
-            environments={environmentsOf(rows)}
-            editing={findEdited(rows, search)}
-          />
-        </>
+    <div className="stack">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">{t("set.generalTitle")}</h1>
+          <p className="page-subtitle">
+            {t("set.scopeGlobal")}
+            {siteId && <> · {t("set.forSite", { site: siteId })}</>} · {t("set.count", { n: rows.length })}
+          </p>
+        </div>
+      </div>
+      {error ? (
+        <Alert type="danger">{t("common.dbError", { error })}</Alert>
+      ) : (
+        <SettingsView rows={rows} params={search} path="/settings" extensionId="*" scope="global" showExtension />
       )}
-    </>
+    </div>
   );
 }

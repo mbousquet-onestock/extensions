@@ -5,10 +5,10 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { withContext } from "@/lib/context";
 import { getT, type MessageKey } from "@/lib/i18n";
 
-const LINKS: { href: string; label: MessageKey }[] = [
-  { href: "/", label: "nav.extensions" },
-  { href: "/settings", label: "nav.settings" },
-  { href: "/logs", label: "nav.logs" },
+const LINKS: { href: string; label: MessageKey; match: (p: string) => boolean }[] = [
+  { href: "/", label: "nav.extensions", match: (p) => p === "/" || p.startsWith("/extensions") },
+  { href: "/settings", label: "nav.settings", match: (p) => p === "/settings" },
+  { href: "/logs", label: "nav.logs", match: (p) => p === "/logs" },
 ];
 
 export default function Nav() {
@@ -16,13 +16,9 @@ export default function Nav() {
   const pathname = usePathname();
   const t = getT(params.get("lang"));
   return (
-    <nav>
+    <nav className="tabs" style={{ marginBottom: 24 }}>
       {LINKS.map((l) => (
-        <Link
-          key={l.href}
-          href={withContext(l.href, params)}
-          className={pathname === l.href ? "active" : undefined}
-        >
+        <Link key={l.href} href={withContext(l.href, params)} className={`tab${l.match(pathname) ? " active" : ""}`}>
           {t(l.label)}
         </Link>
       ))}

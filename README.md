@@ -13,6 +13,10 @@ Les settings peuvent être ajoutés et modifiés depuis ces deux pages (en modif
 
 La page des logs affiche les colonnes réelles de `api_logs`.
 
+## Interface
+
+L'interface applique le design system OneStock (`@onestock-public/design-system`) : police Roboto, couleur primaire `#24bdb0`, cartes bordées sans ombre, onglets OsTabs, badges teintés, alertes OsAlert. Les tokens et composants CSS sont dans `app/globals.css`, les primitives (icônes, alertes, modale) dans `components/ui.tsx`. Les formulaires de création / modification s'ouvrent dans une modale (fermeture par Échap ou clic à l'extérieur).
+
 ## Tables
 
 Créées automatiquement au premier accès (ou via `npm run db:migrate`) :

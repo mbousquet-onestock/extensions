@@ -1,6 +1,6 @@
 import Link from "next/link";
-import SettingForm from "@/components/SettingForm";
-import SettingsTable, { environmentsOf, findEdited } from "@/components/SettingsTable";
+import SettingsView from "@/components/SettingsView";
+import { Alert, Icon } from "@/components/ui";
 import { withContext } from "@/lib/context";
 import { ensureSchema, getSql } from "@/lib/db";
 import { getT } from "@/lib/i18n";
@@ -19,43 +19,52 @@ export default async function ExtensionSettingsPage({
   const search = await searchParams;
   const t = getT(search.lang);
   const siteId = search.site_id;
-  const path = `/extensions/${encodeURIComponent(id)}/settings`;
 
   let name = id;
+  let point: string | null = null;
   let rows: Setting[] = [];
   let error: string | null = null;
   try {
     await ensureSchema();
-    const [ext] = await getSql()`SELECT name FROM extensions WHERE id = ${id}`;
-    if (ext) name = ext.name;
+    const [ext] = await getSql()`SELECT name, installation_point FROM extensions WHERE id = ${id}`;
+    if (ext) {
+      name = ext.name;
+      point = ext.installation_point;
+    }
     rows = await getSettings({ extensionId: id, siteId });
   } catch (e) {
     error = (e as Error).message;
   }
 
   return (
-    <>
-      <p><Link href={withContext("/", search)}>{t("common.back")}</Link></p>
-      <h1>{t("set.extTitle", { name })}</h1>
-      <p className="sub">
-        extension_id <span className="mono">{id}</span>
-        {siteId && <> · {t("set.forSite", { site: siteId })}</>}
-        {" "}· {t("set.count", { n: rows.length })}
-      </p>
-      {error && <p className="card error">{t("common.dbError", { error })}</p>}
-      {!error && (
-        <>
-          <SettingsTable rows={rows} params={search} path={path} />
-          <SettingForm
-            params={search}
-            path={path}
-            extensionId={id}
-            scope="extension"
-            environments={environmentsOf(rows)}
-            editing={findEdited(rows, search)}
-          />
-        </>
+    <div className="stack">
+      <div>
+        <Link href={withContext("/", search)} className="back-link">
+          <Icon name="chevronLeft" />
+          {t("common.back")}
+        </Link>
+        <div className="page-header" style={{ marginBottom: 0 }}>
+          <div>
+            <h1 className="page-title">{t("set.extTitle", { name })}</h1>
+            <p className="page-subtitle">
+              <span className="tag">{id}</span>
+              {point && <> <span className="tag">{point}</span></>}
+              {" "}{siteId ? t("set.forSite", { site: siteId }) : ""} · {t("set.count", { n: rows.length })}
+            </p>
+          </div>
+        </div>
+      </div>
+      {error ? (
+        <Alert type="danger">{t("common.dbError", { error })}</Alert>
+      ) : (
+        <SettingsView
+          rows={rows}
+          params={search}
+          path={`/extensions/${encodeURIComponent(id)}/settings`}
+          extensionId={id}
+          scope="extension"
+        />
       )}
-    </>
+    </div>
   );
 }

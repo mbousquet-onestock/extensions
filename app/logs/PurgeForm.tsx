@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon } from "@/components/ui";
 import { purgeLogs } from "../actions";
 
 const DAYS = [1, 7, 30];
@@ -24,7 +25,7 @@ export default function PurgeForm({
   return (
     <form
       action={purgeLogs}
-      className="row"
+      style={{ display: "flex", gap: 8 }}
       onSubmit={(e) => {
         const days = Number(new FormData(e.currentTarget).get("older_than_days"));
         const i = DAYS.indexOf(days);
@@ -33,14 +34,17 @@ export default function PurgeForm({
     >
       <input type="hidden" name="context" value={context} />
       {canFilterByDate && (
-        <select name="older_than_days" defaultValue="">
+        <select className="select" name="older_than_days" defaultValue="" aria-label={labels.purge}>
           <option value="">{labels.allLogs}</option>
           {DAYS.map((d, i) => (
             <option key={d} value={d}>{labels.olderThan[i]}</option>
           ))}
         </select>
       )}
-      <button className="danger" type="submit">{labels.purge}</button>
+      <button className="btn btn-danger" type="submit">
+        <Icon name="trash" />
+        {labels.purge}
+      </button>
     </form>
   );
 }

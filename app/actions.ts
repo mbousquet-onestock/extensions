@@ -25,8 +25,7 @@ export async function saveExtension(form: FormData) {
       description = EXCLUDED.description,
       updated_at = now()`;
   revalidatePath("/");
-  const back = text(form, "back");
-  if (back.startsWith("/")) redirect(back);
+  redirect(backWith(text(form, "back"), { saved: "1" }));
 }
 
 export async function deleteExtension(form: FormData) {
@@ -76,7 +75,7 @@ export async function purgeLogs(form: FormData) {
 
 function backWith(back: string, extra: Record<string, string>) {
   const url = new URL(back.startsWith("/") ? back : "/", "http://x");
-  for (const k of ["edit_key", "edit_site", "edit_ext", "edit_env", "saved", "error"]) url.searchParams.delete(k);
+  for (const k of ["edit", "new", "edit_key", "edit_site", "edit_ext", "edit_env", "saved", "error", "purged"]) url.searchParams.delete(k);
   for (const [k, v] of Object.entries(extra)) url.searchParams.set(k, v);
   return `${url.pathname}${url.search}`;
 }
@@ -91,8 +90,15 @@ export async function saveSetting(form: FormData) {
   const scope = text(form, "scope") || null;
   const original = text(form, "original"); // JSON des colonnes de clé si modification
 
+  // En cas d'erreur, on rouvre la modale (ajout ou modification) avec le message.
+  const reopen = (error: string) => {
+    if (!original) return backWith(back, { error, new: "1" });
+    const o = JSON.parse(original);
+    return backWith(back, { error, edit_key: o.key, edit_site: o.site_id, edit_ext: o.extension_id, edit_env: o.environment });
+  };
+
   if (!key || !extensionId || !environment || (!siteId && !original)) {
-    redirect(backWith(back, { error: "required" }));
+    redirect(reopen("required"));
   }
 
   const sql = getSql();
@@ -110,7 +116,7 @@ export async function saveSetting(form: FormData) {
     }
   } catch (e) {
     const code = (e as { code?: string }).code;
-    redirect(backWith(back, { error: code === "23505" ? "duplicate" : (e as Error).message }));
+    redirect(reopen(code === "23505" ? "duplicate" : (e as Error).message));
   }
   revalidatePath("/settings");
   revalidatePath("/extensions/[id]/settings", "page");

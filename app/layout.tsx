@@ -12,16 +12,22 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap"
+        />
+      </head>
       <body>
         <Suspense>
-          <header className="topbar">
-            <strong>Extensions</strong>
+          <OneStockContext />
+          <div className="page">
             <Nav />
-          </header>
-          <main>
-            <OneStockContext />
             {children}
-          </main>
+          </div>
         </Suspense>
       </body>
     </html>
