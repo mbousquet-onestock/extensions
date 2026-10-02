@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getSql } from "@/lib/db";
+import { ensureExtensionsTable, getSql } from "@/lib/db";
 
 function text(form: FormData, key: string) {
   return String(form.get(key) ?? "").trim();
@@ -16,6 +16,7 @@ export async function saveExtension(form: FormData) {
   const installed = form.get("installed") === "on";
   if (!id || !name || !point) return;
 
+  await ensureExtensionsTable();
   await getSql()`
     INSERT INTO extensions (id, name, installation_point, installed, settings_url)
     VALUES (${id}, ${name}, ${point}, ${installed}, ${settingsUrl})

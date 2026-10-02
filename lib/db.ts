@@ -11,6 +11,26 @@ export function getSql() {
   return client;
 }
 
+let extensionsTable: Promise<unknown> | null = null;
+
+// Crée la table extensions au premier accès si elle n'existe pas encore.
+export function ensureExtensionsTable() {
+  extensionsTable ??= getSql()`
+    CREATE TABLE IF NOT EXISTS extensions (
+      id                 TEXT PRIMARY KEY,
+      name               TEXT NOT NULL,
+      installation_point TEXT NOT NULL,
+      installed          BOOLEAN NOT NULL DEFAULT false,
+      settings_url       TEXT,
+      created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+    )`.catch((e) => {
+    extensionsTable = null;
+    throw e;
+  });
+  return extensionsTable;
+}
+
 export type Extension = {
   id: string;
   name: string;

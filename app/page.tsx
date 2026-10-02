@@ -1,4 +1,4 @@
-import { getSql, settingsLink, type Extension } from "@/lib/db";
+import { ensureExtensionsTable, getSql, settingsLink, type Extension } from "@/lib/db";
 import { deleteExtension, saveExtension, toggleInstalled } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +13,7 @@ export default async function ExtensionsPage({
   let extensions: Extension[] = [];
   let error: string | null = null;
   try {
+    await ensureExtensionsTable();
     extensions = (await getSql()`
       SELECT id, name, installation_point, installed, settings_url
       FROM extensions ORDER BY installation_point, name`) as Extension[];
