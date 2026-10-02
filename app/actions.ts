@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { clearLogs } from "@/lib/apiLogs";
 import { ensureSchema, getSql } from "@/lib/db";
 
 function text(form: FormData, key: string) {
@@ -54,28 +55,16 @@ export async function uninstallExtension(form: FormData) {
   revalidatePath("/");
 }
 
-export async function purgeLogs(form: FormData) {
-  const days = Number(text(form, "older_than_days"));
-  const sql = getSql();
-  let deleted: number;
-  if (Number.isFinite(days) && days > 0) {
-    const rows = await sql`
-      WITH d AS (DELETE FROM api_logs WHERE created_at < now() - make_interval(days => ${days}::int) RETURNING 1)
-      SELECT count(*)::int AS n FROM d`;
-    deleted = rows[0].n;
-  } else {
-    const rows = await sql`WITH d AS (DELETE FROM api_logs RETURNING 1) SELECT count(*)::int AS n FROM d`;
-    deleted = rows[0].n;
-  }
+export async function clearLogsAction(form: FormData) {
+  const siteId = text(form, "site_id") || undefined;
+  const deleted = await clearLogs(siteId);
   revalidatePath("/logs");
-  const back = new URLSearchParams(text(form, "context"));
-  back.set("purged", String(deleted));
-  redirect(`/logs?${back}`);
+  redirect(backWith(text(form, "back"), { cleared: String(deleted) }));
 }
 
 function backWith(back: string, extra: Record<string, string>) {
   const url = new URL(back.startsWith("/") ? back : "/", "http://x");
-  for (const k of ["edit", "new", "edit_key", "edit_site", "edit_ext", "edit_env", "saved", "error", "purged"]) url.searchParams.delete(k);
+  for (const k of ["edit", "new", "edit_key", "edit_site", "edit_ext", "edit_env", "saved", "error", "purged", "cleared"]) url.searchParams.delete(k);
   for (const [k, v] of Object.entries(extra)) url.searchParams.set(k, v);
   return `${url.pathname}${url.search}`;
 }

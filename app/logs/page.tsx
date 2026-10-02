@@ -1,129 +1,152 @@
 import Link from "next/link";
 import AutoSubmitSelect from "@/components/AutoSubmitSelect";
-import DataTable from "@/components/DataTable";
+import ConfirmButton from "@/components/ConfirmButton";
 import HiddenContext from "@/components/HiddenContext";
+import LogsTable, { type LogEntry } from "@/components/LogsTable";
+import ErrorsOnlyToggle from "@/components/ErrorsOnlyToggle";
 import { Alert, Icon } from "@/components/ui";
-import { contextParams, withContext } from "@/lib/context";
-import { getSql, tableColumns, type Row } from "@/lib/db";
-import { getT } from "@/lib/i18n";
-import PurgeForm from "./PurgeForm";
+import { LOGS_TABLE, readLogs, toEntry } from "@/lib/apiLogs";
+import { withContext } from "@/lib/context";
+import { formatDate, getT } from "@/lib/i18n";
+import { clearLogsAction } from "../actions";
 
 export const dynamic = "force-dynamic";
 
-const PAGE_SIZES = [50, 100, 500];
+const STEP = 100;
+const SLOT = "\u0000";
 
-export default async function LogsPage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | undefined>>;
-}) {
+/** Insère une valeur en « tag » à la place du marqueur dans une phrase traduite. */
+function withTag(sentence: string, value: string) {
+  const [before, after = ""] = sentence.split(SLOT);
+  return (
+    <>
+      {before}
+      <span className="tag">{value}</span>
+      {after}
+    </>
+  );
+}
+
+export default async function LogsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const params = await searchParams;
   const t = getT(params.lang);
-  const q = (params.q ?? "").trim();
-  const size = PAGE_SIZES.includes(Number(params.size)) ? Number(params.size) : PAGE_SIZES[0];
-  const page = Math.max(1, Number(params.page) || 1);
+  const siteId = params.site_id;
+  const filters = {
+    siteId,
+    api: params.api || undefined,
+    errorsOnly: params.errors === "1",
+    search: (params.q ?? "").trim() || undefined,
+  };
+  const limit = Math.min(5000, Math.max(STEP, Number(params.limit) || STEP));
 
-  let columns: string[] = [];
-  let rows: Row[] = [];
-  let total = 0;
+  let data: Awaited<ReturnType<typeof readLogs>> = null;
   let error: string | null = null;
-
   try {
-    const sql = getSql();
-    columns = await tableColumns("api_logs");
-    if (columns.length === 0) throw new Error(t("logs.missing"));
-
-    const orderBy = columns.includes("created_at")
-      ? "created_at DESC"
-      : columns.includes("id")
-        ? "id DESC"
-        : "1";
-    const where = q ? "WHERE l::text ILIKE $1" : "";
-    const args = q ? [`%${q}%`] : [];
-
-    const [countRes, data] = await Promise.all([
-      sql.query(`SELECT count(*)::int AS n FROM api_logs l ${where}`, args),
-      sql.query(
-        `SELECT * FROM api_logs l ${where} ORDER BY ${orderBy} LIMIT ${size} OFFSET ${(page - 1) * size}`,
-        args,
-      ),
-    ]);
-    total = (countRes as { n: number }[])[0].n;
-    rows = data as Row[];
+    data = await readLogs(filters, limit);
+    if (!data) error = t("logs.missing");
   } catch (e) {
     error = (e as Error).message;
   }
 
-  const pages = Math.max(1, Math.ceil(total / size));
-  const href = (p: number) => withContext("/logs", params, { ...(q && { q }), size: String(size), page: String(p) });
+  const view: Record<string, string> = {
+    ...(filters.api && { api: filters.api }),
+    ...(filters.errorsOnly && { errors: "1" }),
+    ...(filters.search && { q: filters.search }),
+  };
+  const here = withContext("/logs", params, view);
+  const siteScoped = !!(siteId && data?.map.site);
 
-  const from = total === 0 ? 0 : (page - 1) * size + 1;
-  const to = Math.min(page * size, total);
+  const entries: LogEntry[] = (data?.rows ?? []).map((row, i) => {
+    const e = toEntry(row, data!.map, i, { entries: (n) => t("calls.entries", { n }), ok: t("calls.ok") });
+    return { ...e, time: e.time instanceof Date ? formatDate(e.time, params) : String(e.time ?? "") };
+  });
 
   return (
     <div className="stack">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">{t("logs.title")}</h1>
-          <p className="page-subtitle">{t("logs.subtitle")}</p>
+      <div className="page-header" style={{ alignItems: "flex-start" }}>
+        <div className="intro">
+          <h1 className="page-title">{t("calls.title")}</h1>
+          <p className="page-subtitle">
+            {t("calls.intro")} {withTag(t("calls.stored", { table: SLOT }), LOGS_TABLE)}
+            {siteScoped && <> {withTag(t("calls.forSite", { site: SLOT }), siteId!)}</>}.
+          </p>
         </div>
+        {data && (
+          <div className="row-actions" style={{ display: "flex", gap: 8 }}>
+            <a
+              className="btn btn-secondary"
+              href={withContext("/logs/export", params, view)}
+              download
+            >
+              <Icon name="download" />
+              {t("calls.export")}
+            </a>
+            <form action={clearLogsAction}>
+              <input type="hidden" name="back" value={here} />
+              {siteScoped && <input type="hidden" name="site_id" value={siteId} />}
+              <ConfirmButton
+                className="btn btn-secondary"
+                message={siteScoped ? t("calls.confirmClearSite", { site: siteId! }) : t("calls.confirmClear")}
+              >
+                {t("calls.clear")}
+              </ConfirmButton>
+            </form>
+          </div>
+        )}
       </div>
 
-      {params.purged !== undefined && <Alert type="success">{t("logs.purged", { n: params.purged })}</Alert>}
+      {params.cleared !== undefined && <Alert type="success">{t("calls.cleared", { n: params.cleared })}</Alert>}
       {error && <Alert type="danger">{t("common.dbError", { error })}</Alert>}
 
-      {!error && (
+      {data && (
         <div className="card flush">
-          <div className="toolbar">
-            <form method="get">
-              <HiddenContext params={params} keep={{ size: String(size) }} />
-              <div className="search">
-                <input className="input" name="q" placeholder={t("logs.searchPh")} defaultValue={q} aria-label={t("logs.searchPh")} />
-                <Icon name="search" />
-              </div>
-            </form>
-            <PurgeForm
-              canFilterByDate={columns.includes("created_at")}
-              context={contextParams(params).toString()}
-              labels={{
-                purge: t("logs.purge"),
-                allLogs: t("logs.allLogs"),
-                olderThan: [1, 7, 30].map((n) => t("logs.olderThan", { n })),
-                confirmOlder: [1, 7, 30].map((n) => t("logs.confirmOlder", { n })),
-                confirmAll: t("logs.confirmAll"),
-              }}
-            />
-          </div>
-
-          <div className="subbar" style={{ justifyContent: "flex-end" }}>
-            <div className="pagination">
-              <span className="range">{t("logs.range", { from, to, total })}</span>
-              <form method="get">
-                <HiddenContext params={params} keep={{ q }} />
-                <AutoSubmitSelect name="size" defaultValue={String(size)} aria-label={t("logs.perPage", { n: "" })}>
-                  {PAGE_SIZES.map((s) => (
-                    <option key={s} value={s}>{t("logs.perPage", { n: s })}</option>
-                  ))}
-                </AutoSubmitSelect>
-              </form>
-              {page > 1 ? (
-                <Link href={href(page - 1)} className="btn btn-icon" aria-label={t("logs.prev")} title={t("logs.prev")}>
-                  <Icon name="chevronLeft" />
-                </Link>
-              ) : (
-                <span className="btn btn-icon" style={{ opacity: 0.3 }}><Icon name="chevronLeft" /></span>
-              )}
-              {page < pages ? (
-                <Link href={href(page + 1)} className="btn btn-icon" aria-label={t("logs.next")} title={t("logs.next")}>
-                  <Icon name="chevronRight" />
-                </Link>
-              ) : (
-                <span className="btn btn-icon" style={{ opacity: 0.3 }}><Icon name="chevronRight" /></span>
-              )}
+          <form method="get" className="toolbar">
+            <HiddenContext params={params} />
+            {data.apis.length > 0 && (
+              <AutoSubmitSelect name="api" defaultValue={filters.api ?? ""} aria-label={t("calls.colApi")}>
+                <option value="">{t("calls.allApis")}</option>
+                {data.apis.map((a) => (
+                  <option key={a} value={a}>{a}</option>
+                ))}
+              </AutoSubmitSelect>
+            )}
+            <ErrorsOnlyToggle checked={filters.errorsOnly} label={t("calls.errorsOnly", { n: data.errors })} />
+            <div className="search">
+              <input className="input" name="q" defaultValue={filters.search} placeholder={t("calls.searchPh")} aria-label={t("calls.searchPh")} />
+              <Icon name="search" />
             </div>
-          </div>
+            <span className="secondary nowrap" style={{ fontSize: 13 }}>
+              {t("calls.shown", { shown: entries.length, total: data.total })}
+            </span>
+          </form>
 
-          <DataTable columns={columns} rows={rows} empty={t("logs.none")} dateParams={params} />
+          <LogsTable
+            entries={entries}
+            showApi={!!data.map.api}
+            labels={{
+              time: t("calls.colTime"),
+              api: t("calls.colApi"),
+              method: t("calls.colMethod"),
+              path: t("calls.colPath"),
+              status: t("calls.colStatus"),
+              duration: t("calls.colDuration"),
+              result: t("calls.colResult"),
+              request: t("calls.request"),
+              response: t("calls.response"),
+              error: t("calls.error"),
+              copy: t("calls.copy"),
+              copied: t("calls.copied"),
+              empty: t("calls.none"),
+            }}
+          />
+
+          {entries.length < data.total && (
+            <div style={{ padding: 16, textAlign: "center", borderTop: "1px solid var(--border-primary)" }}>
+              <Link href={withContext("/logs", params, { ...view, limit: String(limit + STEP) })} className="btn btn-secondary" scroll={false}>
+                {t("calls.loadMore")}
+              </Link>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -9,9 +9,9 @@ App Next.js (déployée sur Vercel) chargée en iframe dans OneStock comme UI ex
 
 Les settings peuvent être ajoutés et modifiés depuis ces deux pages (en modification, seuls la valeur et le scope changent : `key`, `site_id`, `extension_id` et `environment` forment la clé). Ils sont filtrés sur le `site_id` du contexte ; un `site_id` à `*` ou vide vaut pour tous les sites et est marqué « remplacé » quand une valeur existe pour le site. Filtre par `environment`, valeurs sensibles (token, secret…) masquées.
 - **Langue** : les textes de l'interface suivent le paramètre `lang` du contexte (français ou anglais ; une autre langue bascule en anglais, `lang` absent → français). Les dates utilisent `locale` et `timezone` du contexte. Les traductions sont dans `lib/i18n.ts`.
-- **Logs API** (`/logs`) : table `api_logs` (recherche, pagination, purge totale ou par ancienneté).
+- **Appels API** (`/logs`) : historique de la table `api_logs` (filtré sur le site du contexte si la table a une colonne `site_id`) — filtre par API, « erreurs uniquement », recherche, export CSV et vidage. Un clic sur une ligne affiche la requête et la réponse / l'erreur (bouton copier). Tokens et clés sont masqués à l'affichage et à l'export.
 
-La page des logs affiche les colonnes réelles de `api_logs`.
+Les colonnes de `api_logs` sont reconnues par leur nom : `created_at`, `api`, `method`, `path` (ou `url`), `status`, `duration_ms`, `result`, `error`, `request`, `response`, `site_id`.
 
 ## Interface
 
