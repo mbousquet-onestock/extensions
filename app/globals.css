@@ -287,3 +287,23 @@ pre.code { margin: 6px 0 0; padding: 8px; background: var(--neutral-30); border-
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .tag-sub { margin-left: 6px; padding-left: 6px; border-left: 1px solid rgba(81, 91, 96, 0.3); font-weight: 400; color: var(--text-secondary); }
 .link-ext { display: inline-flex; align-items: center; gap: 4px; margin-right: 12px; font-weight: 500; }
+.ext-icon img { width: 100%; height: 100%; object-fit: contain; border-radius: inherit; }
+.modal.wide { max-width: 1040px; }
+.modal-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); align-items: start; }
+.modal-columns > * + * { border-left: 1px solid var(--border-primary); }
+.api-details { padding: var(--spacing-2xl); background: var(--neutral-20); min-width: 0; }
+.api-details-head { display: flex; align-items: center; gap: var(--spacing-l); margin-bottom: var(--spacing-l); }
+.api-kv { font-size: 13px; }
+.api-kv dt { font-family: var(--font-mono); font-size: 12.5px; }
+.api-kv dd { overflow-wrap: anywhere; }
+.table.compact th, .table.compact td { padding: 6px 8px; font-size: 13px; }
+.table.compact { background: #fff; border: 1px solid var(--border-primary); border-radius: var(--radius-m); }
+.raw-json { margin-top: var(--spacing-l); }
+.raw-json summary { cursor: pointer; color: var(--text-brand); font-weight: 500; margin-bottom: 8px; }
+.icon-input { display: flex; align-items: center; gap: var(--spacing-m); flex-wrap: wrap; }
+.points { display: flex; flex-direction: column; gap: var(--spacing-m); }
+.points-head { display: flex; align-items: center; justify-content: space-between; }
+.point-card { border: 1px solid var(--border-primary); border-radius: var(--radius-m); padding: var(--spacing-l); display: flex; flex-direction: column; gap: var(--spacing-m); }
+.point-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: var(--spacing-m); }
+.point-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-m); }
+.section-title { font-size: 14px; font-weight: 500; margin: 0; }

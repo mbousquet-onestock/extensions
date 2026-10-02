@@ -3,7 +3,7 @@
 App Next.js (déployée sur Vercel) chargée en iframe dans OneStock comme UI extension.
 
 - **Contexte** : récupère les paramètres d'URL envoyés par OneStock (`site_id`, `extension_id`, `user_id`, `lang`, `host_app`, `parent_url`, …), fait le handshake `extension_ready` → `onestock_data` par postMessage et vérifie `extension_signature` (HMAC-SHA256 de `${t}.${extension_id}##${user_id}`, valable 6 h) côté serveur. Le contexte est affiché en haut de chaque page et conservé dans les liens. Hors OneStock, on peut saisir un `site_id` à la main.
-- **Extensions** (`/`) : les extensions installées sur le `site_id` du contexte viennent de l'API OneStock — `POST {onestock_api_root}/extensions/query` puis `GET {onestock_api_root}/extensions/{id}` (corps `{ site_id, token }`, token = setting global `onestock_token`) : icône, points d'injection, URL de production / test, dernière mise à jour. Elles sont fusionnées avec le catalogue commun en base (créer, modifier, supprimer). Chaque appel est enregistré dans `api_logs` (token masqué, icônes base64 remplacées par un libellé).
+- **Extensions** (`/`) : les extensions installées sur le `site_id` du contexte viennent de l'API OneStock — `POST {onestock_api_root}/extensions/query` puis `GET {onestock_api_root}/extensions/{id}` (corps `{ site_id, token }`, token = setting global `onestock_token`) : icône, points d'injection, URL de production / test, dernière mise à jour. Elles sont rapprochées du catalogue commun en base **par le nom** (l'id OneStock est généré à la création sur chaque environnement) ; un badge signale les champs qui diffèrent (url, test_url, icon, injection_points). La modale de modification affiche toutes les données de l'API (id, dates, URL, icônes, points d'injection, JSON complet) à côté du formulaire du catalogue ; une extension installée hors catalogue peut y être ajoutée en un clic, formulaire prérempli. La création reprend les champs de l'API : nom, icône (base64, 100 Ko max), url, test_url et points d'injection (anchor, name, slug, path, icône). Chaque appel est enregistré dans `api_logs` (token masqué, icônes base64 remplacées par un libellé).
 - **Settings d'une extension** (`/extensions/<id>/settings`) : lignes de la table `settings` dont `extension_id` est l'id OneStock de l'extension ou le slug d'un de ses points d'injection.
 - **Settings généraux** (`/settings`) : lignes de `settings` avec `scope = 'global'` (ou `extension_id = '*'`).
 
@@ -21,7 +21,7 @@ L'interface applique le design system OneStock (`@onestock-public/design-system`
 
 Créées automatiquement au premier accès (ou via `npm run db:migrate`) :
 
-- `extensions` (`id`, `name`, `installation_point`, `description`)
+- `extensions` (`id` interne, `name` unique, `description`, `icon`, `url`, `test_url`, `injection_points` JSONB)
 
 Table existante utilisée : `settings` (`key`, `value`, `updated_at`, `site_id`, `extension_id`, `environment`, `scope`).
 

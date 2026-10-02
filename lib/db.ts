@@ -21,11 +21,17 @@ export function ensureSchema() {
       CREATE TABLE IF NOT EXISTS extensions (
         id                 TEXT PRIMARY KEY,
         name               TEXT NOT NULL,
-        installation_point TEXT NOT NULL,
+        installation_point TEXT,
         created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
         updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
       )`;
+    // Mêmes champs que l'API OneStock (l'id OneStock, lui, est propre à chaque environnement).
     await sql`ALTER TABLE extensions ADD COLUMN IF NOT EXISTS description TEXT`;
+    await sql`ALTER TABLE extensions ADD COLUMN IF NOT EXISTS icon TEXT`;
+    await sql`ALTER TABLE extensions ADD COLUMN IF NOT EXISTS url TEXT`;
+    await sql`ALTER TABLE extensions ADD COLUMN IF NOT EXISTS test_url TEXT`;
+    await sql`ALTER TABLE extensions ADD COLUMN IF NOT EXISTS injection_points JSONB NOT NULL DEFAULT '[]'::jsonb`;
+    await sql`ALTER TABLE extensions ALTER COLUMN installation_point DROP NOT NULL`;
   })().catch((e) => {
     schema = null;
     throw e;
@@ -33,12 +39,43 @@ export function ensureSchema() {
   return schema;
 }
 
+export type CatalogInjectionPoint = { anchor: string; name?: string; slug?: string; path?: string; icon?: string };
+
+/** Extension du catalogue (commun à tous les sites et environnements). */
 export type Extension = {
   id: string;
   name: string;
-  installation_point: string;
   description: string | null;
+  icon: string | null;
+  url: string | null;
+  test_url: string | null;
+  injection_points: CatalogInjectionPoint[];
+  updated_at?: Date;
 };
+
+/** Lien entre catalogue et extensions installées : le nom (l'id OneStock change selon l'environnement). */
+export const nameKey = (name: string | null | undefined) => (name ?? "").trim().toLowerCase();
+
+export async function readCatalog(): Promise<Extension[]> {
+  await ensureSchema();
+  const rows = await getSql()`
+    SELECT id, name, description, icon, url, test_url, injection_points, installation_point, updated_at
+    FROM extensions ORDER BY name`;
+  return rows.map((r) => {
+    const points = Array.isArray(r.injection_points) ? (r.injection_points as CatalogInjectionPoint[]) : [];
+    return {
+      id: r.id,
+      name: r.name,
+      description: r.description,
+      icon: r.icon,
+      url: r.url,
+      test_url: r.test_url,
+      updated_at: r.updated_at,
+      // Anciennes lignes : un seul point d'installation.
+      injection_points: points.length || !r.installation_point ? points : [{ anchor: r.installation_point, name: r.name }],
+    };
+  });
+}
 
 export type Row = Record<string, unknown>;
 

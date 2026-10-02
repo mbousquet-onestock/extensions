@@ -4,8 +4,10 @@ import ConfirmButton from "@/components/ConfirmButton";
 import HiddenContext from "@/components/HiddenContext";
 import { Alert, Empty, Icon, Modal } from "@/components/ui";
 import { withContext } from "@/lib/context";
-import { ensureSchema, getSql, type Extension } from "@/lib/db";
-import { formatDate, getT } from "@/lib/i18n";
+import ApiExtensionDetails from "@/components/ApiExtensionDetails";
+import ExtensionForm, { type ExtensionFormValues } from "@/components/ExtensionForm";
+import { nameKey, readCatalog, type Extension } from "@/lib/db";
+import { formatDate, getT, type MessageKey } from "@/lib/i18n";
 import { getCredentials, getInstalledExtensions, iconSrc, type OneStockExtension } from "@/lib/onestock";
 import { summarizeError } from "@/lib/payload";
 import { deleteExtension, saveExtension } from "./actions";
@@ -17,13 +19,28 @@ const STATUSES = ["all", "installed", "not_installed"] as const;
 const DEFAULT_POINTS = ["bo.page", "bo.order.action", "bo.orders.action"];
 
 type Row = {
-  id: string;
+  key: string;
   name: string;
   description: string | null;
   catalog?: Extension;
   installed?: OneStockExtension;
   anchors: string[];
+  diff: string[];
 };
+
+const anchorsOf = (points?: { anchor: string }[]) => [...new Set((points ?? []).map((p) => p.anchor).filter(Boolean))];
+const pointsSig = (points?: { anchor: string; slug?: string; name?: string; path?: string }[]) =>
+  JSON.stringify((points ?? []).map((p) => [p.anchor, p.slug ?? "", p.name ?? "", p.path ?? ""]).sort());
+
+/** Champs du catalogue qui diffèrent de l'extension installée. */
+function differences(c: Extension, os: OneStockExtension) {
+  const diff: string[] = [];
+  if ((c.url ?? "") !== (os.url ?? "")) diff.push("url");
+  if ((c.test_url ?? "") !== (os.test_url ?? "")) diff.push("test_url");
+  if ((c.icon ?? "") !== (os.icon ?? "")) diff.push("icon");
+  if (pointsSig(c.injection_points) !== pointsSig(os.injection_points)) diff.push("injection_points");
+  return diff;
+}
 
 export default async function ExtensionsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const params = await searchParams;
@@ -36,9 +53,7 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
   let catalog: Extension[] = [];
   let error: string | null = null;
   try {
-    await ensureSchema();
-    catalog = (await getSql()`
-      SELECT id, name, installation_point, description FROM extensions ORDER BY name`) as Extension[];
+    catalog = await readCatalog();
   } catch (e) {
     error = (e as Error).message;
   }
@@ -60,22 +75,31 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
     }
   }
 
-  const rows = new Map<string, Row>();
+  // Lien catalogue ↔ installées : le nom (l'id OneStock est généré sur chaque environnement).
+  const byName = new Map<string, Row>();
   for (const c of catalog) {
-    rows.set(c.id, { id: c.id, name: c.name, description: c.description, catalog: c, anchors: [c.installation_point] });
+    byName.set(nameKey(c.name), {
+      key: c.id,
+      name: c.name,
+      description: c.description,
+      catalog: c,
+      anchors: anchorsOf(c.injection_points),
+      diff: [],
+    });
   }
   for (const ext of installed) {
-    const anchors = [...new Set((ext.injection_points ?? []).map((p) => p.anchor).filter(Boolean))];
-    const existing = rows.get(ext.id);
-    rows.set(ext.id, {
-      id: ext.id,
+    const existing = byName.get(nameKey(ext.name));
+    byName.set(existing ? nameKey(ext.name) : `os:${ext.id}`, {
+      key: existing?.key ?? `os:${ext.id}`,
       name: ext.name || existing?.name || ext.id,
       description: existing?.description ?? null,
       catalog: existing?.catalog,
       installed: ext,
-      anchors: anchors.length ? anchors : existing?.anchors ?? [],
+      anchors: anchorsOf(ext.injection_points).length ? anchorsOf(ext.injection_points) : existing?.anchors ?? [],
+      diff: existing?.catalog ? differences(existing.catalog, ext) : [],
     });
   }
+  const rows = new Map([...byName.values()].map((r) => [r.key, r]));
   const all = [...rows.values()].sort(
     (a, b) => Number(!!b.installed) - Number(!!a.installed) || a.name.localeCompare(b.name),
   );
@@ -84,7 +108,7 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
   const matching = all.filter(
     (r) =>
       (!point || r.anchors.includes(point)) &&
-      (!q || [r.id, r.name, r.description ?? "", r.installed?.url ?? ""].some((v) => v.toLowerCase().includes(q))),
+      (!q || [r.installed?.id ?? "", r.name, r.description ?? "", r.installed?.url ?? r.catalog?.url ?? ""].some((v) => v.toLowerCase().includes(q))),
   );
   const counts = {
     all: matching.length,
@@ -101,14 +125,34 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
   const { status: _status, ...withoutStatus } = view;
   const here = withContext("/", params, view);
   const editingRow = params.edit ? rows.get(params.edit) : undefined;
-  const editing = editingRow && {
-    id: editingRow.id,
-    name: editingRow.name,
-    installation_point: editingRow.catalog?.installation_point ?? editingRow.anchors[0] ?? "",
-    description: editingRow.description,
-    exists: !!editingRow.catalog,
+  const source = editingRow?.catalog ?? editingRow?.installed;
+  const formValues: ExtensionFormValues = {
+    id: editingRow?.catalog?.id,
+    name: source?.name ?? "",
+    description: editingRow?.catalog?.description ?? "",
+    icon: source?.icon ?? "",
+    url: source?.url ?? "",
+    test_url: source?.test_url ?? "",
+    injection_points: (source?.injection_points ?? []).map((p) => ({
+      anchor: p.anchor,
+      name: p.name ?? "",
+      slug: p.slug ?? "",
+      path: p.path ?? "",
+      icon: p.icon ?? "",
+    })),
   };
-  const modalOpen = params.new === "1" || !!editing;
+  const formError =
+    params.error === "duplicate_name" || params.error === "required" ? t(`ext.${params.error}` as MessageKey) : params.error;
+  const formLabels = {
+    name: t("form.name"), nameHelp: t("form.nameHelp"), description: t("form.description"), icon: t("form.icon"),
+    url: t("form.url"), testUrl: t("form.testUrl"), points: t("form.points"), anchor: t("form.anchor"),
+    pointName: t("form.pointName"), slug: t("form.slug"), path: t("form.path"), addPoint: t("form.addPoint"),
+    removePoint: t("form.removePoint"), chooseIcon: t("form.chooseIcon"), removeIcon: t("form.removeIcon"),
+    iconHelp: t("form.iconHelp"), iconTooBig: t("form.iconTooBig"), noPoints: t("form.noPoints"),
+    cancel: t("common.cancel"), save: t("common.save"), create: editingRow?.installed ? t("ext.addToCatalog") : t("ext.createBtn"),
+  };
+  const editing = !!editingRow;
+  const modalOpen = params.new === "1" || editing;
   const statusLabel = { all: "ext.filterAll", installed: "ext.filterInstalled", not_installed: "ext.filterNotInstalled" } as const;
 
   return (
@@ -179,9 +223,10 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
             <tbody>
               {visible.map((row) => {
                 const os = row.installed;
-                const icon = iconSrc(os?.icon);
+                const icon = iconSrc(os?.icon ?? row.catalog?.icon ?? undefined);
+                const links = { url: os?.url ?? row.catalog?.url ?? undefined, test: os?.test_url ?? row.catalog?.test_url ?? undefined };
                 return (
-                  <tr key={row.id}>
+                  <tr key={row.key}>
                     <td>
                       <div className="ext-name">
                         {icon ? (
@@ -192,15 +237,15 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
                         )}
                         <div>
                           <div className="primary-text">{row.name}</div>
-                          <div className="tertiary-text mono">{row.id}</div>
+                          {os && <div className="tertiary-text mono">{os.id}</div>}
                           {row.description && <div className="tertiary-text">{row.description}</div>}
                         </div>
                       </div>
                     </td>
                     <td>
                       <div className="chips">
-                        {os?.injection_points?.length
-                          ? os.injection_points.map((p, i) => (
+                        {(os?.injection_points ?? row.catalog?.injection_points)?.length
+                          ? (os?.injection_points ?? row.catalog!.injection_points).map((p, i) => (
                               <span key={`${p.anchor}-${p.slug ?? i}`} className="tag" title={[p.name, p.slug, p.path].filter(Boolean).join(" · ")}>
                                 {p.anchor}
                                 {p.slug && <span className="tag-sub">{p.slug}</span>}
@@ -210,11 +255,11 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
                       </div>
                     </td>
                     <td className="nowrap">
-                      {os?.url && <a href={os.url} target="_blank" rel="noreferrer" className="link-ext">{t("ext.prod")}</a>}
-                      {os?.test_url && os.test_url !== os.url && (
-                        <a href={os.test_url} target="_blank" rel="noreferrer" className="link-ext">{t("ext.test")}</a>
+                      {links.url && <a href={links.url} target="_blank" rel="noreferrer" className="link-ext">{t("ext.prod")}</a>}
+                      {links.test && links.test !== links.url && (
+                        <a href={links.test} target="_blank" rel="noreferrer" className="link-ext">{t("ext.test")}</a>
                       )}
-                      {!os?.url && !os?.test_url && <span className="secondary">—</span>}
+                      {!links.url && !links.test && <span className="secondary">—</span>}
                     </td>
                     {siteId && (
                       <td className="nowrap">
@@ -231,13 +276,18 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
                           <span className="badge badge-grey">{t("ext.notInstalled")}</span>
                         )}
                         {!row.catalog && <div className="tertiary-text">{t("ext.notInCatalog")}</div>}
+                        {row.diff.length > 0 && (
+                          <div title={t("ext.diffFields", { fields: row.diff.join(", ") })} style={{ marginTop: 4 }}>
+                            <span className="badge badge-orange">{t("ext.diff")}</span>
+                          </div>
+                        )}
                       </td>
                     )}
                     <td className="actions-col">
                       <div className="actions">
                         {os && (
                           <Link
-                            href={withContext(`/extensions/${encodeURIComponent(row.id)}/settings`, params)}
+                            href={withContext(`/extensions/${encodeURIComponent(os.id)}/settings`, params)}
                             className="btn btn-secondary btn-small"
                           >
                             <Icon name="settings" />
@@ -245,7 +295,7 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
                           </Link>
                         )}
                         <Link
-                          href={withContext("/", params, { ...view, edit: row.id })}
+                          href={withContext("/", params, { ...view, edit: row.key })}
                           className="btn btn-icon"
                           title={t("common.edit")}
                           aria-label={t("common.edit")}
@@ -255,7 +305,7 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
                         </Link>
                         {row.catalog && (
                           <form action={deleteExtension}>
-                            <input type="hidden" name="id" value={row.id} />
+                            <input type="hidden" name="id" value={row.catalog.id} />
                             <ConfirmButton message={t("ext.confirmDelete", { name: row.name })} title={t("common.delete")}>
                               <Icon name="trash" />
                             </ConfirmButton>
@@ -274,50 +324,35 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
 
       {modalOpen && (
         <Modal
-          title={editing ? t("ext.editTitle", { name: editing.name }) : t("ext.create")}
+          title={editingRow ? editingRow.name : t("ext.create")}
           closeHref={here}
           closeLabel={t("common.close")}
+          wide={!!editingRow?.installed}
         >
-          <form action={saveExtension}>
-            <input type="hidden" name="back" value={here} />
-            <div className="modal-body">
-              <div className="form-grid">
-                <label className="field">
-                  <span className="field-label">{t("ext.colId")}</span>
-                  <input className="input mono" name="id" required defaultValue={editing?.id} readOnly={!!editing} autoFocus={!editing} />
-                  <span className="field-help">{t("ext.idHelp")}</span>
-                </label>
-                <label className="field">
-                  <span className="field-label">{t("ext.colName")}</span>
-                  <input className="input" name="name" required defaultValue={editing?.name} autoFocus={!!editing} />
-                </label>
-                <label className="field full">
-                  <span className="field-label">{t("ext.colPoint")}</span>
-                  <input
-                    className="input mono"
-                    name="installation_point"
-                    required
-                    list="points"
-                    placeholder="bo.order.action"
-                    defaultValue={editing?.installation_point}
-                  />
-                  <datalist id="points">
-                    {[...new Set([...DEFAULT_POINTS, ...points])].map((p) => (
-                      <option key={p} value={p} />
-                    ))}
-                  </datalist>
-                </label>
-                <label className="field full">
-                  <span className="field-label">{t("ext.colDescription")}</span>
-                  <textarea className="textarea" style={{ fontFamily: "inherit" }} name="description" rows={3} defaultValue={editing?.description ?? ""} />
-                </label>
-              </div>
+          <div className={editingRow?.installed ? "modal-columns" : undefined}>
+            {editingRow?.installed && <ApiExtensionDetails ext={editingRow.installed} t={t} dateParams={params} />}
+            <div>
+              {(editingRow?.installed || formError) && (
+                <div className="modal-body" style={{ paddingBottom: 0 }}>
+                  {editingRow?.installed && <h3 className="section-title">{t("ext.catalogSection")}</h3>}
+                  {formError && <Alert type="danger">{formError}</Alert>}
+                  {editingRow?.installed && !editingRow.catalog && <Alert type="info">{t("ext.importHelp")}</Alert>}
+                  {editingRow && editingRow.diff.length > 0 && (
+                    <Alert type="neutral">{t("ext.diffFields", { fields: editingRow.diff.join(", ") })}</Alert>
+                  )}
+                </div>
+              )}
+              <ExtensionForm
+                key={params.edit ?? "new"}
+                action={saveExtension}
+                initial={formValues}
+                back={here}
+                editKey={editingRow?.key}
+                anchors={[...new Set([...DEFAULT_POINTS, ...points])]}
+                labels={formLabels}
+              />
             </div>
-            <div className="modal-footer">
-              <Link href={here} className="btn btn-secondary" scroll={false}>{t("common.cancel")}</Link>
-              <button className="btn btn-primary" type="submit">{editing?.exists ? t("common.save") : t("ext.createBtn")}</button>
-            </div>
-          </form>
+          </div>
         </Modal>
       )}
     </div>

@@ -56,16 +56,18 @@ export function Modal({
   title,
   closeHref,
   closeLabel,
+  wide,
   children,
 }: {
   title: string;
   closeHref: string;
   closeLabel: string;
+  wide?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <ModalBackdrop closeHref={closeHref}>
-      <div className="modal" role="dialog" aria-modal="true" aria-label={title}>
+      <div className={`modal${wide ? " wide" : ""}`} role="dialog" aria-modal="true" aria-label={title}>
         <div className="modal-header">
           <h2>{title}</h2>
           <Link href={closeHref} className="btn btn-icon" aria-label={closeLabel} title={closeLabel} scroll={false}>

@@ -3,30 +3,65 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { clearLogs } from "@/lib/apiLogs";
-import { ensureSchema, getSql } from "@/lib/db";
+import { randomUUID } from "node:crypto";
+import { ensureSchema, getSql, nameKey, type CatalogInjectionPoint } from "@/lib/db";
 
 function text(form: FormData, key: string) {
   return String(form.get(key) ?? "").trim();
 }
 
 export async function saveExtension(form: FormData) {
+  const back = text(form, "back");
   const id = text(form, "id");
   const name = text(form, "name");
-  const point = text(form, "installation_point");
-  const description = text(form, "description") || null;
-  if (!id || !name || !point) return;
+  const editKey = text(form, "edit_key") || id;
+  const reopen = (error: string) => backWith(back, editKey ? { error, edit: editKey } : { error, new: "1" });
+  if (!name) redirect(reopen("required"));
+
+  let points: CatalogInjectionPoint[] = [];
+  try {
+    const raw = JSON.parse(String(form.get("injection_points") ?? "[]"));
+    points = (Array.isArray(raw) ? raw : [])
+      .map((p) => ({
+        anchor: String(p.anchor ?? "").trim(),
+        name: String(p.name ?? "").trim() || undefined,
+        slug: String(p.slug ?? "").trim() || undefined,
+        path: String(p.path ?? "").trim() || undefined,
+        icon: String(p.icon ?? "").trim() || undefined,
+      }))
+      .filter((p) => p.anchor);
+  } catch {}
+
+  const values = {
+    name,
+    description: text(form, "description") || null,
+    icon: text(form, "icon") || null,
+    url: text(form, "url") || null,
+    test_url: text(form, "test_url") || null,
+    points: JSON.stringify(points),
+  };
 
   await ensureSchema();
-  await getSql()`
-    INSERT INTO extensions (id, name, installation_point, description)
-    VALUES (${id}, ${name}, ${point}, ${description})
-    ON CONFLICT (id) DO UPDATE SET
-      name = EXCLUDED.name,
-      installation_point = EXCLUDED.installation_point,
-      description = EXCLUDED.description,
-      updated_at = now()`;
+  const sql = getSql();
+  // Le nom fait le lien avec les extensions installées : il doit être unique dans le catalogue.
+  const [dup] = await sql`
+    SELECT id FROM extensions WHERE lower(trim(name)) = ${nameKey(name)} AND id <> ${id || ""}`;
+  if (dup) redirect(reopen("duplicate_name"));
+
+  if (id) {
+    await sql`
+      UPDATE extensions SET name = ${values.name}, description = ${values.description}, icon = ${values.icon},
+        url = ${values.url}, test_url = ${values.test_url}, injection_points = ${values.points}::jsonb,
+        installation_point = ${points[0]?.anchor ?? null}, updated_at = now()
+      WHERE id = ${id}`;
+  } else {
+    await sql`
+      INSERT INTO extensions (id, name, description, icon, url, test_url, injection_points, installation_point)
+      VALUES (${randomUUID()}, ${values.name}, ${values.description}, ${values.icon}, ${values.url},
+        ${values.test_url}, ${values.points}::jsonb, ${points[0]?.anchor ?? null})`;
+  }
   revalidatePath("/");
-  redirect(backWith(text(form, "back"), { saved: "1" }));
+  redirect(backWith(back, { saved: "1" }));
 }
 
 export async function deleteExtension(form: FormData) {
