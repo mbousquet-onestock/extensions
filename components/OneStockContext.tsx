@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CONTEXT_KEYS } from "@/lib/context";
+import { getT, resolveLang, type MessageKey } from "@/lib/i18n";
 
 type Shared = Record<string, unknown>;
 type Verify = { status: "valid" | "invalid" | "not_configured" | "pending"; reason?: string };
@@ -26,6 +27,12 @@ export default function OneStockContext() {
   const [shared, setShared] = useState<Shared | null>(null);
   const [verify, setVerify] = useState<Verify | null>(null);
   const [siteInput, setSiteInput] = useState("");
+  const lang = params.get("lang");
+  const t = getT(lang);
+
+  useEffect(() => {
+    document.documentElement.lang = resolveLang(lang);
+  }, [lang]);
 
   const inIframe = typeof window !== "undefined" && window.parent !== window;
   const parentUrl = params.get("parent_url");
@@ -60,7 +67,7 @@ export default function OneStockContext() {
       })
         .then((r) => r.json())
         .then(setVerify)
-        .catch(() => setVerify({ status: "invalid", reason: "Vérification impossible" }));
+        .catch(() => setVerify({ status: "invalid", reason: "failed" }));
     };
 
     window.addEventListener("message", onMessage);
@@ -87,21 +94,26 @@ export default function OneStockContext() {
   const siteId = params.get("site_id");
 
   const badge = !inIframe
-    ? { cls: "off", label: "Hors OneStock" }
+    ? { cls: "off", label: t("ctx.outside") }
     : !verify || verify.status === "pending"
-      ? { cls: "off", label: shared ? "Vérification…" : "En attente du contexte…" }
+      ? { cls: "off", label: shared ? t("ctx.verifying") : t("ctx.waiting") }
       : verify.status === "valid"
-        ? { cls: "on", label: "Signature valide" }
+        ? { cls: "on", label: t("ctx.valid") }
         : verify.status === "not_configured"
-          ? { cls: "off", label: "Signature non vérifiée (EXTENSION_SECRETS absent)" }
-          : { cls: "err", label: `Signature invalide : ${verify.reason}` };
+          ? { cls: "off", label: t("ctx.notConfigured") }
+          : {
+              cls: "err",
+              label: t("ctx.invalid", {
+                reason: verify.reason === "failed" ? t("ctx.verifyFailed") : t(`ctx.reason.${verify.reason}` as MessageKey),
+              }),
+            };
 
   return (
     <details className="card context">
       <summary className="row">
-        <strong>Contexte</strong>
+        <strong>{t("ctx.title")}</strong>
         <span>
-          Site : <span className="mono">{siteId ?? "—"}</span>
+          {t("ctx.site")} : <span className="mono">{siteId ?? "—"}</span>
         </span>
         <span className={`badge ${badge.cls}`}>{badge.label}</span>
       </summary>
@@ -119,13 +131,13 @@ export default function OneStockContext() {
           }}
         >
           <input value={siteInput} onChange={(e) => setSiteInput(e.target.value)} placeholder="site_id" />
-          <button type="submit">Choisir le site</button>
+          <button type="submit">{t("ctx.chooseSite")}</button>
         </form>
       )}
 
       <div className="ctx-grid">
         <div>
-          <h3>Paramètres d&apos;URL</h3>
+          <h3>{t("ctx.urlParams")}</h3>
           {urlContext.length ? (
             <dl>
               {urlContext.map(([k, v]) => (
@@ -136,15 +148,15 @@ export default function OneStockContext() {
               ))}
             </dl>
           ) : (
-            <p className="sub">Aucun paramètre.</p>
+            <p className="sub">{t("ctx.noParams")}</p>
           )}
         </div>
         <div>
-          <h3>Données onestock_data</h3>
+          <h3>{t("ctx.sharedData")}</h3>
           {shared ? (
             <pre className="mono">{JSON.stringify(shared, null, 2)}</pre>
           ) : (
-            <p className="sub">{inIframe ? "En attente…" : "Page ouverte hors de OneStock."}</p>
+            <p className="sub">{inIframe ? t("ctx.pending") : t("ctx.openedOutside")}</p>
           )}
         </div>
       </div>

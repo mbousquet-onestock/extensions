@@ -1,6 +1,7 @@
 import DataTable from "@/components/DataTable";
 import { contextParams, withContext } from "@/lib/context";
 import { getSql, tableColumns, type Row } from "@/lib/db";
+import { getT } from "@/lib/i18n";
 import PurgeForm from "./PurgeForm";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +14,7 @@ export default async function LogsPage({
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const params = await searchParams;
+  const t = getT(params.lang);
   const q = (params.q ?? "").trim();
   const size = PAGE_SIZES.includes(Number(params.size)) ? Number(params.size) : PAGE_SIZES[0];
   const page = Math.max(1, Number(params.page) || 1);
@@ -25,7 +27,7 @@ export default async function LogsPage({
   try {
     const sql = getSql();
     columns = await tableColumns("api_logs");
-    if (columns.length === 0) throw new Error("La table api_logs n'existe pas (lancer npm run db:migrate).");
+    if (columns.length === 0) throw new Error(t("logs.missing"));
 
     const orderBy = columns.includes("created_at")
       ? "created_at DESC"
@@ -53,37 +55,47 @@ export default async function LogsPage({
 
   return (
     <>
-      <h1>Appels API</h1>
-      <p className="sub">{total} entrée(s) dans api_logs</p>
+      <h1>{t("logs.title")}</h1>
+      <p className="sub">{t("logs.count", { n: total })}</p>
 
       {params.purged !== undefined && (
-        <p className="card notice">{params.purged} log(s) supprimé(s).</p>
+        <p className="card notice">{t("logs.purged", { n: params.purged })}</p>
       )}
-      {error && <p className="card error">Erreur base de données : {error}</p>}
+      {error && <p className="card error">{t("common.dbError", { error })}</p>}
 
       <div className="card row" style={{ justifyContent: "space-between" }}>
         <form className="row" method="get">
           {[...contextParams(params)].map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
-          <input name="q" placeholder="Rechercher (url, statut, contenu…)" defaultValue={q} size={32} />
+          <input name="q" placeholder={t("logs.searchPh")} defaultValue={q} size={32} />
           <select name="size" defaultValue={String(size)}>
             {PAGE_SIZES.map((s) => (
-              <option key={s} value={s}>{s} / page</option>
+              <option key={s} value={s}>{t("logs.perPage", { n: s })}</option>
             ))}
           </select>
-          <button type="submit">Rechercher</button>
+          <button type="submit">{t("common.search")}</button>
         </form>
         {!error && (
-          <PurgeForm canFilterByDate={columns.includes("created_at")} context={contextParams(params).toString()} />
+          <PurgeForm
+            canFilterByDate={columns.includes("created_at")}
+            context={contextParams(params).toString()}
+            labels={{
+              purge: t("logs.purge"),
+              allLogs: t("logs.allLogs"),
+              olderThan: [1, 7, 30].map((n) => t("logs.olderThan", { n })),
+              confirmOlder: [1, 7, 30].map((n) => t("logs.confirmOlder", { n })),
+              confirmAll: t("logs.confirmAll"),
+            }}
+          />
         )}
       </div>
 
-      {!error && <DataTable columns={columns} rows={rows} empty="Aucun log." />}
+      {!error && <DataTable columns={columns} rows={rows} empty={t("logs.none")} dateParams={params} />}
 
       {pages > 1 && (
         <div className="row">
-          {page > 1 && <a href={href(page - 1)}>← Précédent</a>}
-          <span className="sub">Page {page} / {pages}</span>
-          {page < pages && <a href={href(page + 1)}>Suivant →</a>}
+          {page > 1 && <a href={href(page - 1)}>{t("logs.prev")}</a>}
+          <span className="sub">{t("logs.page", { page, pages })}</span>
+          {page < pages && <a href={href(page + 1)}>{t("logs.next")}</a>}
         </div>
       )}
     </>

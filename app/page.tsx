@@ -3,6 +3,7 @@ import { ensureSchema, getSql, type Extension } from "@/lib/db";
 import { withContext } from "@/lib/context";
 import { deleteExtension, installExtension, saveExtension, uninstallExtension } from "./actions";
 import ConfirmButton from "@/components/ConfirmButton";
+import { formatDate, getT } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,7 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
   const siteId = params.site_id ?? "";
   const point = params.point ?? "";
   const edit = params.edit ?? "";
+  const t = getT(params.lang);
 
   let extensions: Extension[] = [];
   let installed = new Map<string, Date>();
@@ -40,29 +42,29 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
 
   return (
     <>
-      <h1>Extensions</h1>
+      <h1>{t("ext.title")}</h1>
       <p className="sub">
-        {extensions.length} extension(s) disponible(s)
-        {siteId && <> · {onSite.length} installée(s) sur le site <span className="mono">{siteId}</span></>}
+        {t("ext.available", { n: extensions.length })}
+        {siteId && <> · {t("ext.installedOn", { n: onSite.length })} <span className="mono">{siteId}</span></>}
       </p>
 
-      {error && <p className="card error">Erreur base de données : {error}</p>}
+      {error && <p className="card error">{t("common.dbError", { error })}</p>}
 
       <div className="section-title">
-        <h2>Installées sur le site {siteId && <span className="mono">{siteId}</span>}</h2>
+        <h2>{t("ext.installedSection")} {siteId && <span className="mono">{siteId}</span>}</h2>
       </div>
       {!siteId ? (
-        <p className="card sub">Aucun site_id dans le contexte : ouvrez la page depuis OneStock ou choisissez un site ci-dessus.</p>
+        <p className="card sub">{t("ext.noSite")}</p>
       ) : (
         <div className="card table-wrap">
           <table>
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Nom</th>
-                <th>Point d&apos;installation</th>
-                <th>Installée le</th>
-                <th>Settings</th>
+                <th>{t("ext.colId")}</th>
+                <th>{t("ext.colName")}</th>
+                <th>{t("ext.colPoint")}</th>
+                <th>{t("ext.colInstalledAt")}</th>
+                <th>{t("ext.colSettings")}</th>
                 <th></th>
               </tr>
             </thead>
@@ -72,24 +74,26 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
                   <td className="mono">{ext.id}</td>
                   <td>{ext.name}</td>
                   <td className="mono">{ext.installation_point}</td>
-                  <td>{installed.get(ext.id)?.toLocaleString("fr-FR")}</td>
+                  <td>{formatDate(installed.get(ext.id), params)}</td>
                   <td>
                     <Link href={withContext(`/extensions/${encodeURIComponent(ext.id)}/settings`, params)}>
-                      Voir les settings
+                      {t("ext.viewSettings")}
                     </Link>
                   </td>
                   <td>
                     <form action={uninstallExtension}>
                       <input type="hidden" name="id" value={ext.id} />
                       <input type="hidden" name="site_id" value={siteId} />
-                      <ConfirmButton message={`Désinstaller ${ext.name} du site ${siteId} ?`}>Désinstaller</ConfirmButton>
+                      <ConfirmButton message={t("ext.confirmUninstall", { name: ext.name, site: siteId })}>
+                        {t("ext.uninstall")}
+                      </ConfirmButton>
                     </form>
                   </td>
                 </tr>
               ))}
               {onSite.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="sub">Aucune extension installée sur ce site.</td>
+                  <td colSpan={6} className="sub">{t("ext.noneInstalled")}</td>
                 </tr>
               )}
             </tbody>
@@ -98,29 +102,29 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
       )}
 
       <div className="section-title">
-        <h2>Catalogue (disponibles pour tous les sites)</h2>
+        <h2>{t("ext.catalog")}</h2>
         <form className="row" method="get">
           {Object.entries(params)
             .filter(([k]) => k !== "point" && k !== "edit")
             .map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
           <select name="point" defaultValue={point}>
-            <option value="">Tous les points d&apos;installation</option>
+            <option value="">{t("ext.allPoints")}</option>
             {points.map((p) => (
               <option key={p} value={p}>{p}</option>
             ))}
           </select>
-          <button type="submit">Filtrer</button>
+          <button type="submit">{t("common.filter")}</button>
         </form>
       </div>
       <div className="card table-wrap">
         <table>
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Nom</th>
-              <th>Point d&apos;installation</th>
-              <th>Description</th>
-              {siteId && <th>Sur ce site</th>}
+              <th>{t("ext.colId")}</th>
+              <th>{t("ext.colName")}</th>
+              <th>{t("ext.colPoint")}</th>
+              <th>{t("ext.colDescription")}</th>
+              {siteId && <th>{t("ext.colOnSite")}</th>}
               <th></th>
             </tr>
           </thead>
@@ -136,12 +140,12 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
                   {siteId && (
                     <td>
                       {isInstalled ? (
-                        <span className="badge on">Installée</span>
+                        <span className="badge on">{t("ext.installed")}</span>
                       ) : (
                         <form action={installExtension}>
                           <input type="hidden" name="id" value={ext.id} />
                           <input type="hidden" name="site_id" value={siteId} />
-                          <button className="link" type="submit">Installer</button>
+                          <button className="link" type="submit">{t("ext.install")}</button>
                         </form>
                       )}
                     </td>
@@ -149,12 +153,12 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
                   <td>
                     <div className="row">
                       <Link href={withContext("/", params, { edit: ext.id, ...(point && { point }) }) + "#form"}>
-                        Modifier
+                        {t("common.edit")}
                       </Link>
                       <form action={deleteExtension}>
                         <input type="hidden" name="id" value={ext.id} />
-                        <ConfirmButton message={`Supprimer ${ext.name} du catalogue (et de tous les sites) ?`}>
-                          Supprimer
+                        <ConfirmButton message={t("ext.confirmDelete", { name: ext.name })}>
+                          {t("common.delete")}
                         </ConfirmButton>
                       </form>
                     </div>
@@ -164,7 +168,7 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
             })}
             {catalog.length === 0 && !error && (
               <tr>
-                <td colSpan={siteId ? 6 : 5} className="sub">Aucune extension.</td>
+                <td colSpan={siteId ? 6 : 5} className="sub">{t("ext.none")}</td>
               </tr>
             )}
           </tbody>
@@ -172,20 +176,20 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
       </div>
 
       <div className="card" id="form">
-        <h2>{editing ? `Modifier ${editing.name}` : "Créer une extension"}</h2>
+        <h2>{editing ? t("ext.editTitle", { name: editing.name }) : t("ext.create")}</h2>
         <form action={saveExtension} className="row" key={editing?.id ?? "new"}>
           <input type="hidden" name="back" value={here} />
           <input
             name="id"
-            placeholder="ID"
+            placeholder={t("ext.phId")}
             required
             defaultValue={editing?.id}
             readOnly={!!editing}
           />
-          <input name="name" placeholder="Nom" required defaultValue={editing?.name} />
+          <input name="name" placeholder={t("ext.phName")} required defaultValue={editing?.name} />
           <input
             name="installation_point"
-            placeholder="Point (ex : bo.order.action)"
+            placeholder={t("ext.phPoint")}
             required
             list="points"
             defaultValue={editing?.installation_point}
@@ -195,9 +199,9 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
               <option key={p} value={p} />
             ))}
           </datalist>
-          <input name="description" placeholder="Description" defaultValue={editing?.description ?? ""} size={40} />
-          <button className="primary" type="submit">{editing ? "Enregistrer" : "Créer"}</button>
-          {editing && <Link href={here}>Annuler</Link>}
+          <input name="description" placeholder={t("ext.phDescription")} defaultValue={editing?.description ?? ""} size={40} />
+          <button className="primary" type="submit">{editing ? t("common.save") : t("ext.createBtn")}</button>
+          {editing && <Link href={here}>{t("common.cancel")}</Link>}
         </form>
       </div>
     </>

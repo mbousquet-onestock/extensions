@@ -85,3 +85,5 @@ h2 { font-size: 15px; margin: 0 0 12px; }
 .section-title h2 { margin: 0; }
 tr.muted td { opacity: .55; }
 .row a.active { font-weight: 600; }
+textarea { font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+input[readonly] { background: var(--off-bg); }

@@ -1,7 +1,9 @@
 import Link from "next/link";
-import SettingsTable from "@/components/SettingsTable";
+import SettingForm from "@/components/SettingForm";
+import SettingsTable, { environmentsOf, findEdited } from "@/components/SettingsTable";
 import { withContext } from "@/lib/context";
 import { ensureSchema, getSql } from "@/lib/db";
+import { getT } from "@/lib/i18n";
 import { getSettings, type Setting } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +17,9 @@ export default async function ExtensionSettingsPage({
 }) {
   const { id } = await params;
   const search = await searchParams;
+  const t = getT(search.lang);
   const siteId = search.site_id;
+  const path = `/extensions/${encodeURIComponent(id)}/settings`;
 
   let name = id;
   let rows: Setting[] = [];
@@ -31,15 +35,27 @@ export default async function ExtensionSettingsPage({
 
   return (
     <>
-      <p><Link href={withContext("/", search)}>← Extensions</Link></p>
-      <h1>Settings de {name}</h1>
+      <p><Link href={withContext("/", search)}>{t("common.back")}</Link></p>
+      <h1>{t("set.extTitle", { name })}</h1>
       <p className="sub">
         extension_id <span className="mono">{id}</span>
-        {siteId && <> · site <span className="mono">{siteId}</span> (et tous les sites)</>}
-        {" "}· {rows.length} setting(s)
+        {siteId && <> · {t("set.forSite", { site: siteId })}</>}
+        {" "}· {t("set.count", { n: rows.length })}
       </p>
-      {error && <p className="card error">Erreur base de données : {error}</p>}
-      {!error && <SettingsTable rows={rows} params={search} path={`/extensions/${encodeURIComponent(id)}/settings`} />}
+      {error && <p className="card error">{t("common.dbError", { error })}</p>}
+      {!error && (
+        <>
+          <SettingsTable rows={rows} params={search} path={path} />
+          <SettingForm
+            params={search}
+            path={path}
+            extensionId={id}
+            scope="extension"
+            environments={environmentsOf(rows)}
+            editing={findEdited(rows, search)}
+          />
+        </>
+      )}
     </>
   );
 }

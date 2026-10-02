@@ -1,0 +1,253 @@
+// Textes statiques de l'interface, traduits selon le paramètre `lang` du contexte OneStock.
+
+const fr = {
+  "nav.extensions": "Extensions",
+  "nav.settings": "Settings généraux",
+  "nav.logs": "Logs API",
+  "common.dbError": "Erreur base de données : {error}",
+  "common.save": "Enregistrer",
+  "common.cancel": "Annuler",
+  "common.edit": "Modifier",
+  "common.delete": "Supprimer",
+  "common.filter": "Filtrer",
+  "common.search": "Rechercher",
+  "common.back": "← Extensions",
+
+  "ctx.title": "Contexte",
+  "ctx.site": "Site",
+  "ctx.outside": "Hors OneStock",
+  "ctx.waiting": "En attente du contexte…",
+  "ctx.verifying": "Vérification…",
+  "ctx.valid": "Signature valide",
+  "ctx.notConfigured": "Signature non vérifiée (EXTENSION_SECRETS absent)",
+  "ctx.invalid": "Signature invalide : {reason}",
+  "ctx.verifyFailed": "Vérification impossible",
+  "ctx.reason.missing": "signature absente",
+  "ctx.reason.no_timestamp": "horodatage manquant",
+  "ctx.reason.expired": "signature expirée (> 6 h)",
+  "ctx.reason.mismatch": "signature non reconnue",
+  "ctx.chooseSite": "Choisir le site",
+  "ctx.urlParams": "Paramètres d'URL",
+  "ctx.noParams": "Aucun paramètre.",
+  "ctx.sharedData": "Données onestock_data",
+  "ctx.pending": "En attente…",
+  "ctx.openedOutside": "Page ouverte hors de OneStock.",
+
+  "ext.title": "Extensions",
+  "ext.available": "{n} extension(s) disponible(s)",
+  "ext.installedOn": "{n} installée(s) sur le site",
+  "ext.installedSection": "Installées sur le site",
+  "ext.noSite": "Aucun site_id dans le contexte : ouvrez la page depuis OneStock ou choisissez un site ci-dessus.",
+  "ext.colId": "ID",
+  "ext.colName": "Nom",
+  "ext.colPoint": "Point d'installation",
+  "ext.colInstalledAt": "Installée le",
+  "ext.colSettings": "Settings",
+  "ext.colDescription": "Description",
+  "ext.colOnSite": "Sur ce site",
+  "ext.viewSettings": "Voir les settings",
+  "ext.uninstall": "Désinstaller",
+  "ext.install": "Installer",
+  "ext.installed": "Installée",
+  "ext.confirmUninstall": "Désinstaller {name} du site {site} ?",
+  "ext.confirmDelete": "Supprimer {name} du catalogue (et de tous les sites) ?",
+  "ext.noneInstalled": "Aucune extension installée sur ce site.",
+  "ext.catalog": "Catalogue (disponibles pour tous les sites)",
+  "ext.allPoints": "Tous les points d'installation",
+  "ext.none": "Aucune extension.",
+  "ext.create": "Créer une extension",
+  "ext.editTitle": "Modifier {name}",
+  "ext.createBtn": "Créer",
+  "ext.phId": "ID",
+  "ext.phName": "Nom",
+  "ext.phPoint": "Point (ex : bo.order.action)",
+  "ext.phDescription": "Description",
+
+  "set.extTitle": "Settings de {name}",
+  "set.generalTitle": "Settings généraux",
+  "set.scopeGlobal": "scope global",
+  "set.forSite": "site {site} (et tous les sites)",
+  "set.count": "{n} setting(s)",
+  "set.environment": "Environnement :",
+  "set.all": "Tous",
+  "set.colKey": "Clé",
+  "set.colValue": "Valeur",
+  "set.colSite": "Site",
+  "set.colExtension": "Extension",
+  "set.colEnvironment": "Environnement",
+  "set.colScope": "Scope",
+  "set.colUpdated": "Mis à jour",
+  "set.allSites": "tous les sites",
+  "set.allExtensions": "toutes",
+  "set.overridden": "remplacé",
+  "set.none": "Aucun setting.",
+  "set.add": "Ajouter un setting",
+  "set.editTitle": "Modifier le setting {key}",
+  "set.phSite": "site_id (* = tous les sites)",
+  "set.phEnvironment": "Environnement",
+  "set.saved": "Setting enregistré.",
+  "set.required": "Clé, site, extension et environnement sont obligatoires.",
+  "set.duplicate": "Ce setting existe déjà (même clé, site, extension et environnement) : modifiez-le.",
+
+  "logs.title": "Appels API",
+  "logs.count": "{n} entrée(s) dans api_logs",
+  "logs.purged": "{n} log(s) supprimé(s).",
+  "logs.searchPh": "Rechercher (url, statut, contenu…)",
+  "logs.perPage": "{n} / page",
+  "logs.none": "Aucun log.",
+  "logs.prev": "← Précédent",
+  "logs.next": "Suivant →",
+  "logs.page": "Page {page} / {pages}",
+  "logs.missing": "La table api_logs n'existe pas (lancer npm run db:migrate).",
+  "logs.purge": "Purger",
+  "logs.allLogs": "Tous les logs",
+  "logs.olderThan": "Plus de {n} jour(s)",
+  "logs.confirmOlder": "Supprimer les logs de plus de {n} jour(s) ?",
+  "logs.confirmAll": "Supprimer TOUS les logs API ?",
+} as const;
+
+export type MessageKey = keyof typeof fr;
+
+const en: Record<MessageKey, string> = {
+  "nav.extensions": "Extensions",
+  "nav.settings": "General settings",
+  "nav.logs": "API logs",
+  "common.dbError": "Database error: {error}",
+  "common.save": "Save",
+  "common.cancel": "Cancel",
+  "common.edit": "Edit",
+  "common.delete": "Delete",
+  "common.filter": "Filter",
+  "common.search": "Search",
+  "common.back": "← Extensions",
+
+  "ctx.title": "Context",
+  "ctx.site": "Site",
+  "ctx.outside": "Outside OneStock",
+  "ctx.waiting": "Waiting for context…",
+  "ctx.verifying": "Verifying…",
+  "ctx.valid": "Valid signature",
+  "ctx.notConfigured": "Signature not verified (EXTENSION_SECRETS missing)",
+  "ctx.invalid": "Invalid signature: {reason}",
+  "ctx.verifyFailed": "Verification failed",
+  "ctx.reason.missing": "missing signature",
+  "ctx.reason.no_timestamp": "missing timestamp",
+  "ctx.reason.expired": "expired signature (> 6 h)",
+  "ctx.reason.mismatch": "unrecognized signature",
+  "ctx.chooseSite": "Choose site",
+  "ctx.urlParams": "URL parameters",
+  "ctx.noParams": "No parameters.",
+  "ctx.sharedData": "onestock_data payload",
+  "ctx.pending": "Waiting…",
+  "ctx.openedOutside": "Page opened outside OneStock.",
+
+  "ext.title": "Extensions",
+  "ext.available": "{n} available extension(s)",
+  "ext.installedOn": "{n} installed on site",
+  "ext.installedSection": "Installed on site",
+  "ext.noSite": "No site_id in context: open this page from OneStock or choose a site above.",
+  "ext.colId": "ID",
+  "ext.colName": "Name",
+  "ext.colPoint": "Installation point",
+  "ext.colInstalledAt": "Installed on",
+  "ext.colSettings": "Settings",
+  "ext.colDescription": "Description",
+  "ext.colOnSite": "On this site",
+  "ext.viewSettings": "View settings",
+  "ext.uninstall": "Uninstall",
+  "ext.install": "Install",
+  "ext.installed": "Installed",
+  "ext.confirmUninstall": "Uninstall {name} from site {site}?",
+  "ext.confirmDelete": "Delete {name} from the catalog (and from every site)?",
+  "ext.noneInstalled": "No extension installed on this site.",
+  "ext.catalog": "Catalog (available for every site)",
+  "ext.allPoints": "All installation points",
+  "ext.none": "No extension.",
+  "ext.create": "Create an extension",
+  "ext.editTitle": "Edit {name}",
+  "ext.createBtn": "Create",
+  "ext.phId": "ID",
+  "ext.phName": "Name",
+  "ext.phPoint": "Point (e.g. bo.order.action)",
+  "ext.phDescription": "Description",
+
+  "set.extTitle": "{name} settings",
+  "set.generalTitle": "General settings",
+  "set.scopeGlobal": "global scope",
+  "set.forSite": "site {site} (and all sites)",
+  "set.count": "{n} setting(s)",
+  "set.environment": "Environment:",
+  "set.all": "All",
+  "set.colKey": "Key",
+  "set.colValue": "Value",
+  "set.colSite": "Site",
+  "set.colExtension": "Extension",
+  "set.colEnvironment": "Environment",
+  "set.colScope": "Scope",
+  "set.colUpdated": "Updated",
+  "set.allSites": "all sites",
+  "set.allExtensions": "all",
+  "set.overridden": "overridden",
+  "set.none": "No setting.",
+  "set.add": "Add a setting",
+  "set.editTitle": "Edit setting {key}",
+  "set.phSite": "site_id (* = all sites)",
+  "set.phEnvironment": "Environment",
+  "set.saved": "Setting saved.",
+  "set.required": "Key, site, extension and environment are required.",
+  "set.duplicate": "This setting already exists (same key, site, extension and environment): edit it instead.",
+
+  "logs.title": "API calls",
+  "logs.count": "{n} entry(ies) in api_logs",
+  "logs.purged": "{n} log(s) deleted.",
+  "logs.searchPh": "Search (url, status, content…)",
+  "logs.perPage": "{n} / page",
+  "logs.none": "No log.",
+  "logs.prev": "← Previous",
+  "logs.next": "Next →",
+  "logs.page": "Page {page} / {pages}",
+  "logs.missing": "The api_logs table does not exist (run npm run db:migrate).",
+  "logs.purge": "Purge",
+  "logs.allLogs": "All logs",
+  "logs.olderThan": "Older than {n} day(s)",
+  "logs.confirmOlder": "Delete logs older than {n} day(s)?",
+  "logs.confirmAll": "Delete ALL API logs?",
+};
+
+const DICTIONARIES = { fr, en } as const;
+export type Lang = keyof typeof DICTIONARIES;
+
+/** `fr`, `fr_FR`, `fr-FR` → fr ; toute autre langue fournie → en ; absente → fr. */
+export function resolveLang(lang?: string | null): Lang {
+  if (!lang) return "fr";
+  const base = lang.toLowerCase().split(/[-_]/)[0];
+  return base in DICTIONARIES ? (base as Lang) : "en";
+}
+
+export type T = (key: MessageKey, vars?: Record<string, string | number>) => string;
+
+export function getT(lang?: string | null): T {
+  const dict: Record<MessageKey, string> = DICTIONARIES[resolveLang(lang)];
+  return (key, vars) =>
+    dict[key].replace(/\{(\w+)\}/g, (_, name) => (vars && name in vars ? String(vars[name]) : `{${name}}`));
+}
+
+/** Locale pour les dates : paramètre `locale` du contexte, sinon langue résolue. */
+export function dateLocale(params: { locale?: string | null; lang?: string | null }) {
+  const raw = params.locale?.replace("_", "-");
+  try {
+    if (raw) return new Intl.DateTimeFormat(raw).resolvedOptions().locale;
+  } catch {}
+  return resolveLang(params.lang) === "fr" ? "fr-FR" : "en-GB";
+}
+
+/** Date au format de la locale et du fuseau horaire du contexte. */
+export function formatDate(value: unknown, params: { locale?: string | null; lang?: string | null; timezone?: string | null }) {
+  if (!(value instanceof Date)) return String(value ?? "");
+  const locale = dateLocale(params);
+  try {
+    return value.toLocaleString(locale, params.timezone ? { timeZone: params.timezone } : {});
+  } catch {
+    return value.toLocaleString(locale);
+  }
+}

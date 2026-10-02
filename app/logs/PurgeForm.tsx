@@ -2,29 +2,45 @@
 
 import { purgeLogs } from "../actions";
 
-export default function PurgeForm({ canFilterByDate, context }: { canFilterByDate: boolean; context: string }) {
+const DAYS = [1, 7, 30];
+
+type Labels = {
+  purge: string;
+  allLogs: string;
+  olderThan: string[];
+  confirmOlder: string[];
+  confirmAll: string;
+};
+
+export default function PurgeForm({
+  canFilterByDate,
+  context,
+  labels,
+}: {
+  canFilterByDate: boolean;
+  context: string;
+  labels: Labels;
+}) {
   return (
     <form
       action={purgeLogs}
       className="row"
       onSubmit={(e) => {
-        const days = new FormData(e.currentTarget).get("older_than_days");
-        const msg = days
-          ? `Supprimer les logs de plus de ${days} jour(s) ?`
-          : "Supprimer TOUS les logs API ?";
-        if (!confirm(msg)) e.preventDefault();
+        const days = Number(new FormData(e.currentTarget).get("older_than_days"));
+        const i = DAYS.indexOf(days);
+        if (!confirm(i >= 0 ? labels.confirmOlder[i] : labels.confirmAll)) e.preventDefault();
       }}
     >
       <input type="hidden" name="context" value={context} />
       {canFilterByDate && (
         <select name="older_than_days" defaultValue="">
-          <option value="">Tous les logs</option>
-          <option value="1">Plus de 1 jour</option>
-          <option value="7">Plus de 7 jours</option>
-          <option value="30">Plus de 30 jours</option>
+          <option value="">{labels.allLogs}</option>
+          {DAYS.map((d, i) => (
+            <option key={d} value={d}>{labels.olderThan[i]}</option>
+          ))}
         </select>
       )}
-      <button className="danger" type="submit">Purger</button>
+      <button className="danger" type="submit">{labels.purge}</button>
     </form>
   );
 }

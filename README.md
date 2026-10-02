@@ -7,7 +7,8 @@ App Next.js (déployée sur Vercel) chargée en iframe dans OneStock comme UI ex
 - **Settings d'une extension** (`/extensions/<id>/settings`) : lignes de la table `settings` dont `extension_id` correspond.
 - **Settings généraux** (`/settings`) : lignes de `settings` avec `scope = 'global'` (ou `extension_id = '*'`).
 
-Les settings sont filtrés sur le `site_id` du contexte ; un `site_id` à `*` ou vide vaut pour tous les sites et est marqué « remplacé » quand une valeur existe pour le site. Filtre par `environment`, valeurs sensibles (token, secret…) masquées.
+Les settings peuvent être ajoutés et modifiés depuis ces deux pages (en modification, seuls la valeur et le scope changent : `key`, `site_id`, `extension_id` et `environment` forment la clé). Ils sont filtrés sur le `site_id` du contexte ; un `site_id` à `*` ou vide vaut pour tous les sites et est marqué « remplacé » quand une valeur existe pour le site. Filtre par `environment`, valeurs sensibles (token, secret…) masquées.
+- **Langue** : les textes de l'interface suivent le paramètre `lang` du contexte (français ou anglais ; une autre langue bascule en anglais, `lang` absent → français). Les dates utilisent `locale` et `timezone` du contexte. Les traductions sont dans `lib/i18n.ts`.
 - **Logs API** (`/logs`) : table `api_logs` (recherche, pagination, purge totale ou par ancienneté).
 
 La page des logs affiche les colonnes réelles de `api_logs`.

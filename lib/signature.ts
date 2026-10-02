@@ -4,7 +4,7 @@ const MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
 export type SignatureResult =
   | { status: "valid" }
-  | { status: "invalid"; reason: string }
+  | { status: "invalid"; reason: "missing" | "no_timestamp" | "expired" | "mismatch" }
   | { status: "not_configured" };
 
 /**
@@ -19,7 +19,7 @@ export function checkExtensionSignature(
   now = Date.now(),
 ): SignatureResult {
   if (secrets.length === 0) return { status: "not_configured" };
-  if (!signature) return { status: "invalid", reason: "Signature absente" };
+  if (!signature) return { status: "invalid", reason: "missing" };
 
   const parts = Object.fromEntries(
     signature.split(",").map((p) => {
@@ -28,9 +28,9 @@ export function checkExtensionSignature(
     }),
   );
   const t = Number(parts.t);
-  if (!Number.isFinite(t)) return { status: "invalid", reason: "Horodatage manquant" };
+  if (!Number.isFinite(t)) return { status: "invalid", reason: "no_timestamp" };
   const tMs = t > 1e12 ? t : t * 1000;
-  if (Math.abs(now - tMs) > MAX_AGE_MS) return { status: "invalid", reason: "Signature expirée (> 6 h)" };
+  if (Math.abs(now - tMs) > MAX_AGE_MS) return { status: "invalid", reason: "expired" };
 
   const hashes = Object.entries(parts)
     .filter(([k, v]) => /^h\d+$/.test(k) && v)
@@ -43,5 +43,5 @@ export function checkExtensionSignature(
       return { status: "valid" };
     }
   }
-  return { status: "invalid", reason: "Signature non reconnue" };
+  return { status: "invalid", reason: "mismatch" };
 }

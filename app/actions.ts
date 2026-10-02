@@ -73,3 +73,46 @@ export async function purgeLogs(form: FormData) {
   back.set("purged", String(deleted));
   redirect(`/logs?${back}`);
 }
+
+function backWith(back: string, extra: Record<string, string>) {
+  const url = new URL(back.startsWith("/") ? back : "/", "http://x");
+  for (const k of ["edit_key", "edit_site", "edit_ext", "edit_env", "saved", "error"]) url.searchParams.delete(k);
+  for (const [k, v] of Object.entries(extra)) url.searchParams.set(k, v);
+  return `${url.pathname}${url.search}`;
+}
+
+export async function saveSetting(form: FormData) {
+  const back = text(form, "back");
+  const key = text(form, "key");
+  const value = String(form.get("value") ?? "");
+  const siteId = text(form, "site_id");
+  const extensionId = text(form, "extension_id");
+  const environment = text(form, "environment");
+  const scope = text(form, "scope") || null;
+  const original = text(form, "original"); // JSON des colonnes de clé si modification
+
+  if (!key || !extensionId || !environment || (!siteId && !original)) {
+    redirect(backWith(back, { error: "required" }));
+  }
+
+  const sql = getSql();
+  try {
+    if (original) {
+      const o = JSON.parse(original) as { key: string; site_id: string; extension_id: string; environment: string };
+      await sql`
+        UPDATE settings SET value = ${value}, scope = ${scope}, updated_at = now()
+        WHERE key = ${o.key} AND site_id = ${o.site_id}
+          AND extension_id = ${o.extension_id} AND environment = ${o.environment}`;
+    } else {
+      await sql`
+        INSERT INTO settings (key, value, site_id, extension_id, environment, scope, updated_at)
+        VALUES (${key}, ${value}, ${siteId}, ${extensionId}, ${environment}, ${scope}, now())`;
+    }
+  } catch (e) {
+    const code = (e as { code?: string }).code;
+    redirect(backWith(back, { error: code === "23505" ? "duplicate" : (e as Error).message }));
+  }
+  revalidatePath("/settings");
+  revalidatePath("/extensions/[id]/settings", "page");
+  redirect(backWith(back, { saved: "1" }));
+}
