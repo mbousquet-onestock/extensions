@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useState } from "react";
+import Payload from "@/components/Payload";
 
 export type LogEntry = {
   key: string;
@@ -44,32 +45,6 @@ function statusBadge(status: number) {
   return status >= 500 ? "badge-red" : status >= 400 ? "badge-orange" : status >= 300 ? "badge-blue" : "badge-green";
 }
 
-function CodeBlock({ title, value, labels, error }: { title: string; value: string; labels: Labels; error?: boolean }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <div className="log-block">
-      <div className="log-block-head">
-        <strong>{title}</strong>
-        {value && (
-          <button
-            type="button"
-            className="btn btn-tertiary btn-small"
-            onClick={() => {
-              navigator.clipboard?.writeText(value).then(() => {
-                setCopied(true);
-                setTimeout(() => setCopied(false), 1500);
-              });
-            }}
-          >
-            {copied ? labels.copied : labels.copy}
-          </button>
-        )}
-      </div>
-      <pre className={`log-code${error ? " error" : ""}`}>{value || "—"}</pre>
-    </div>
-  );
-}
-
 export default function LogsTable({ entries, labels, showApi }: { entries: LogEntry[]; labels: Labels; showApi: boolean }) {
   const [open, setOpen] = useState<string | null>(null);
   const cols = showApi ? 7 : 6;
@@ -109,12 +84,19 @@ export default function LogsTable({ entries, labels, showApi }: { entries: LogEn
                 {isOpen && (
                   <tr className="details">
                     <td colSpan={cols}>
+                      <div className="log-meta">
+                        {e.method && <span className="badge badge-grey">{e.method}</span>}
+                        <span className="mono log-url">{e.path}</span>
+                        {e.status !== null && <span className={`badge ${statusBadge(e.status)}`}>{e.status}</span>}
+                        {e.duration && <span className="secondary">{e.duration}</span>}
+                        <span className="secondary">{e.time}</span>
+                      </div>
                       <div className="log-details">
-                        <CodeBlock title={labels.request} value={e.request} labels={labels} />
+                        <Payload title={labels.request} raw={e.request} copyLabel={labels.copy} copiedLabel={labels.copied} />
                         {e.error ? (
-                          <CodeBlock title={labels.error} value={e.error} labels={labels} error />
+                          <Payload title={labels.error} raw={e.error} error copyLabel={labels.copy} copiedLabel={labels.copied} />
                         ) : (
-                          <CodeBlock title={labels.response} value={e.response} labels={labels} />
+                          <Payload title={labels.response} raw={e.response} copyLabel={labels.copy} copiedLabel={labels.copied} />
                         )}
                       </div>
                     </td>

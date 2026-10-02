@@ -1,4 +1,5 @@
 import { getSql, tableColumns } from "@/lib/db";
+import { summarizeError } from "@/lib/payload";
 
 export const LOGS_TABLE = "api_logs";
 
@@ -170,11 +171,11 @@ export function toEntry(
   const responseValue = get("response");
   const isError = !!error || (status !== null && status >= 400);
 
-  let result = error ? error.replace(/\s+/g, " ") : pretty(get("result")).replace(/\s+/g, " ");
+  let result = error ? summarizeError(error) : pretty(get("result")).replace(/\s+/g, " ");
   if (!result) {
     const parsed = typeof responseValue === "string" ? safeParse(responseValue) : responseValue;
     if (Array.isArray(parsed)) result = words.entries(parsed.length);
-    else if (isError && responseValue) result = pretty(responseValue).replace(/\s+/g, " ");
+    else if (isError && responseValue) result = summarizeError(pretty(responseValue));
     else if (status !== null && status < 400) result = words.ok;
   }
 
