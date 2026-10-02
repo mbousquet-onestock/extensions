@@ -36,25 +36,6 @@ export async function deleteExtension(form: FormData) {
   revalidatePath("/");
 }
 
-export async function installExtension(form: FormData) {
-  const id = text(form, "id");
-  const siteId = text(form, "site_id");
-  if (!id || !siteId) return;
-  await ensureSchema();
-  await getSql()`
-    INSERT INTO site_extensions (site_id, extension_id) VALUES (${siteId}, ${id})
-    ON CONFLICT DO NOTHING`;
-  revalidatePath("/");
-}
-
-export async function uninstallExtension(form: FormData) {
-  const id = text(form, "id");
-  const siteId = text(form, "site_id");
-  await ensureSchema();
-  await getSql()`DELETE FROM site_extensions WHERE site_id = ${siteId} AND extension_id = ${id}`;
-  revalidatePath("/");
-}
-
 export async function clearLogsAction(form: FormData) {
   const siteId = text(form, "site_id") || undefined;
   const deleted = await clearLogs(siteId);

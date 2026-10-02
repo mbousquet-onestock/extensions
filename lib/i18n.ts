@@ -157,6 +157,15 @@ const fr = {
   "calls.entries": "{n} entrée(s)",
   "calls.ok": "OK",
   "calls.none": "Aucun appel.",
+  "ext.colInjection": "Points d'injection",
+  "ext.colLinks": "Liens",
+  "ext.prod": "Production",
+  "ext.test": "Test",
+  "ext.updatedAt": "Mise à jour {date}",
+  "ext.noCredentials": "Extensions installées indisponibles : les settings globaux onestock_api_root et onestock_token sont absents pour le site {site}.",
+  "ext.apiError": "Extensions installées indisponibles (API OneStock) : {error}",
+  "ext.source": "Installées sur le site {site} d'après l'API OneStock ({env}) · catalogue commun en base",
+  "ext.notInCatalog": "Hors catalogue",
 } as const;
 
 export type MessageKey = keyof typeof fr;
@@ -318,6 +327,15 @@ const en: Record<MessageKey, string> = {
   "calls.entries": "{n} entries",
   "calls.ok": "OK",
   "calls.none": "No call.",
+  "ext.colInjection": "Injection points",
+  "ext.colLinks": "Links",
+  "ext.prod": "Production",
+  "ext.test": "Test",
+  "ext.updatedAt": "Updated {date}",
+  "ext.noCredentials": "Installed extensions unavailable: global settings onestock_api_root and onestock_token are missing for site {site}.",
+  "ext.apiError": "Installed extensions unavailable (OneStock API): {error}",
+  "ext.source": "Installed on site {site} according to the OneStock API ({env}) · shared catalog in database",
+  "ext.notInCatalog": "Not in catalog",
 };
 
 const DICTIONARIES = { fr, en } as const;

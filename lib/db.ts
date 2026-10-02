@@ -13,7 +13,7 @@ export function getSql() {
 
 let schema: Promise<unknown> | null = null;
 
-// Crée les tables extensions et site_extensions au premier accès si elles n'existent pas encore.
+// Crée la table extensions (catalogue) au premier accès si elles n'existent pas encore.
 export function ensureSchema() {
   schema ??= (async () => {
     const sql = getSql();
@@ -26,13 +26,6 @@ export function ensureSchema() {
         updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
       )`;
     await sql`ALTER TABLE extensions ADD COLUMN IF NOT EXISTS description TEXT`;
-    await sql`
-      CREATE TABLE IF NOT EXISTS site_extensions (
-        site_id      TEXT NOT NULL,
-        extension_id TEXT NOT NULL REFERENCES extensions (id) ON DELETE CASCADE,
-        installed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-        PRIMARY KEY (site_id, extension_id)
-      )`;
   })().catch((e) => {
     schema = null;
     throw e;

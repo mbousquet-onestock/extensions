@@ -19,12 +19,13 @@ export const isWildcard = (v: string | null | undefined) => v == null || WILDCAR
  * - extensionId : settings de cette extension
  * - sinon : settings généraux (scope = 'global' ou extension_id = '*')
  */
-export async function getSettings({ extensionId, siteId }: { extensionId?: string; siteId?: string }) {
+export async function getSettings({ extensionId, siteId }: { extensionId?: string | string[]; siteId?: string }) {
   const where: string[] = [];
-  const args: string[] = [];
-  if (extensionId) {
-    args.push(extensionId);
-    where.push(`extension_id = $${args.length}`);
+  const args: (string | string[])[] = [];
+  const ids = [extensionId ?? []].flat().filter(Boolean);
+  if (ids.length) {
+    args.push(ids);
+    where.push(`extension_id = ANY($${args.length})`);
   } else {
     where.push(`(scope = 'global' OR extension_id = '*')`);
   }

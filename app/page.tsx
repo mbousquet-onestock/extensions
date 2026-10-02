@@ -6,13 +6,24 @@ import { Alert, Empty, Icon, Modal } from "@/components/ui";
 import { withContext } from "@/lib/context";
 import { ensureSchema, getSql, type Extension } from "@/lib/db";
 import { formatDate, getT } from "@/lib/i18n";
-import { deleteExtension, installExtension, saveExtension, uninstallExtension } from "./actions";
+import { getCredentials, getInstalledExtensions, iconSrc, type OneStockExtension } from "@/lib/onestock";
+import { summarizeError } from "@/lib/payload";
+import { deleteExtension, saveExtension } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 type Search = Record<string, string | undefined>;
 const STATUSES = ["all", "installed", "not_installed"] as const;
 const DEFAULT_POINTS = ["bo.page", "bo.order.action", "bo.orders.action"];
+
+type Row = {
+  id: string;
+  name: string;
+  description: string | null;
+  catalog?: Extension;
+  installed?: OneStockExtension;
+  anchors: string[];
+};
 
 export default async function ExtensionsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const params = await searchParams;
@@ -22,40 +33,66 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
   const point = params.point ?? "";
   const status = siteId && STATUSES.includes(params.status as never) ? params.status! : "all";
 
-  let extensions: Extension[] = [];
-  let installed = new Map<string, Date>();
+  let catalog: Extension[] = [];
   let error: string | null = null;
   try {
     await ensureSchema();
-    const sql = getSql();
-    const [exts, inst] = await Promise.all([
-      sql`SELECT id, name, installation_point, description FROM extensions ORDER BY name`,
-      siteId
-        ? sql`SELECT extension_id, installed_at FROM site_extensions WHERE site_id = ${siteId}`
-        : Promise.resolve([]),
-    ]);
-    extensions = exts as Extension[];
-    installed = new Map(inst.map((r) => [r.extension_id as string, r.installed_at as Date]));
+    catalog = (await getSql()`
+      SELECT id, name, installation_point, description FROM extensions ORDER BY name`) as Extension[];
   } catch (e) {
     error = (e as Error).message;
   }
 
-  const points = [...new Set(extensions.map((e) => e.installation_point))].sort();
-  const matching = extensions.filter(
-    (e) =>
-      (!point || e.installation_point === point) &&
-      (!q || [e.id, e.name, e.description ?? ""].some((v) => v.toLowerCase().includes(q))),
+  // Extensions installées sur le site : API OneStock (onestock_api_root + onestock_token).
+  let installed: OneStockExtension[] = [];
+  let apiProblem: string | null = null;
+  let environment: string | null = null;
+  if (siteId && !error) {
+    try {
+      const creds = await getCredentials(siteId, params.parent_url);
+      if (!creds) apiProblem = t("ext.noCredentials", { site: siteId });
+      else {
+        environment = creds.environment;
+        installed = await getInstalledExtensions(creds, siteId);
+      }
+    } catch (e) {
+      apiProblem = t("ext.apiError", { error: summarizeError((e as Error).message) });
+    }
+  }
+
+  const rows = new Map<string, Row>();
+  for (const c of catalog) {
+    rows.set(c.id, { id: c.id, name: c.name, description: c.description, catalog: c, anchors: [c.installation_point] });
+  }
+  for (const ext of installed) {
+    const anchors = [...new Set((ext.injection_points ?? []).map((p) => p.anchor).filter(Boolean))];
+    const existing = rows.get(ext.id);
+    rows.set(ext.id, {
+      id: ext.id,
+      name: ext.name || existing?.name || ext.id,
+      description: existing?.description ?? null,
+      catalog: existing?.catalog,
+      installed: ext,
+      anchors: anchors.length ? anchors : existing?.anchors ?? [],
+    });
+  }
+  const all = [...rows.values()].sort(
+    (a, b) => Number(!!b.installed) - Number(!!a.installed) || a.name.localeCompare(b.name),
+  );
+
+  const points = [...new Set([...all.flatMap((r) => r.anchors)])].sort();
+  const matching = all.filter(
+    (r) =>
+      (!point || r.anchors.includes(point)) &&
+      (!q || [r.id, r.name, r.description ?? "", r.installed?.url ?? ""].some((v) => v.toLowerCase().includes(q))),
   );
   const counts = {
     all: matching.length,
-    installed: matching.filter((e) => installed.has(e.id)).length,
-    not_installed: matching.filter((e) => !installed.has(e.id)).length,
+    installed: matching.filter((r) => r.installed).length,
+    not_installed: matching.filter((r) => !r.installed).length,
   };
-  const visible = matching.filter(
-    (e) => status === "all" || (status === "installed") === installed.has(e.id),
-  );
+  const visible = matching.filter((r) => status === "all" || (status === "installed") === !!r.installed);
 
-  // Paramètres de la vue courante, conservés par les liens et formulaires.
   const view: Record<string, string> = {
     ...(params.q && { q: params.q }),
     ...(point && { point }),
@@ -63,7 +100,14 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
   };
   const { status: _status, ...withoutStatus } = view;
   const here = withContext("/", params, view);
-  const editing = params.edit ? extensions.find((e) => e.id === params.edit) : undefined;
+  const editingRow = params.edit ? rows.get(params.edit) : undefined;
+  const editing = editingRow && {
+    id: editingRow.id,
+    name: editingRow.name,
+    installation_point: editingRow.catalog?.installation_point ?? editingRow.anchors[0] ?? "",
+    description: editingRow.description,
+    exists: !!editingRow.catalog,
+  };
   const modalOpen = params.new === "1" || !!editing;
   const statusLabel = { all: "ext.filterAll", installed: "ext.filterInstalled", not_installed: "ext.filterNotInstalled" } as const;
 
@@ -73,7 +117,7 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
         <div>
           <h1 className="page-title">{t("ext.title")}</h1>
           <p className="page-subtitle">
-            {siteId ? t("ext.subtitleSite", { site: siteId }) : t("ext.subtitleNoSite")}
+            {siteId && environment ? t("ext.source", { site: siteId, env: environment }) : t("ext.subtitleNoSite")}
           </p>
         </div>
       </div>
@@ -81,6 +125,7 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
       {params.saved && <Alert type="success">{t("ext.saved")}</Alert>}
       {error && <Alert type="danger">{t("common.dbError", { error })}</Alert>}
       {!siteId && <Alert type="info">{t("ext.noSite")}</Alert>}
+      {apiProblem && <Alert type="danger">{apiProblem}</Alert>}
 
       <div className="card flush">
         <div className="toolbar">
@@ -90,7 +135,7 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
               <input className="input" name="q" defaultValue={params.q} placeholder={t("ext.searchPh")} aria-label={t("ext.searchPh")} />
               <Icon name="search" />
             </div>
-            <AutoSubmitSelect name="point" defaultValue={point} aria-label={t("ext.colPoint")}>
+            <AutoSubmitSelect name="point" defaultValue={point} aria-label={t("ext.colInjection")}>
               <option value="">{t("ext.allPoints")}</option>
               {points.map((p) => (
                 <option key={p} value={p}>{p}</option>
@@ -125,58 +170,82 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
             <thead>
               <tr>
                 <th>{t("ext.colName")}</th>
-                <th>{t("ext.colPoint")}</th>
-                <th>{t("ext.colDescription")}</th>
+                <th>{t("ext.colInjection")}</th>
+                <th>{t("ext.colLinks")}</th>
                 {siteId && <th>{t("ext.colStatus")}</th>}
                 <th className="actions-col"><span className="sr-only">{t("common.actions")}</span></th>
               </tr>
             </thead>
             <tbody>
-              {visible.map((ext) => {
-                const installedAt = installed.get(ext.id);
+              {visible.map((row) => {
+                const os = row.installed;
+                const icon = iconSrc(os?.icon);
                 return (
-                  <tr key={ext.id}>
+                  <tr key={row.id}>
                     <td>
-                      <div className="primary-text">{ext.name}</div>
-                      <div className="tertiary-text mono">{ext.id}</div>
+                      <div className="ext-name">
+                        {icon ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={icon} alt="" className="ext-icon" />
+                        ) : (
+                          <span className="ext-icon placeholder"><Icon name="cube" /></span>
+                        )}
+                        <div>
+                          <div className="primary-text">{row.name}</div>
+                          <div className="tertiary-text mono">{row.id}</div>
+                          {row.description && <div className="tertiary-text">{row.description}</div>}
+                        </div>
+                      </div>
                     </td>
-                    <td><span className="tag">{ext.installation_point}</span></td>
-                    <td className="cell secondary">{ext.description || "—"}</td>
+                    <td>
+                      <div className="chips">
+                        {os?.injection_points?.length
+                          ? os.injection_points.map((p, i) => (
+                              <span key={`${p.anchor}-${p.slug ?? i}`} className="tag" title={[p.name, p.slug, p.path].filter(Boolean).join(" · ")}>
+                                {p.anchor}
+                                {p.slug && <span className="tag-sub">{p.slug}</span>}
+                              </span>
+                            ))
+                          : row.anchors.map((a) => <span key={a} className="tag">{a}</span>)}
+                      </div>
+                    </td>
+                    <td className="nowrap">
+                      {os?.url && <a href={os.url} target="_blank" rel="noreferrer" className="link-ext">{t("ext.prod")}</a>}
+                      {os?.test_url && os.test_url !== os.url && (
+                        <a href={os.test_url} target="_blank" rel="noreferrer" className="link-ext">{t("ext.test")}</a>
+                      )}
+                      {!os?.url && !os?.test_url && <span className="secondary">—</span>}
+                    </td>
                     {siteId && (
                       <td className="nowrap">
-                        {installedAt ? (
+                        {os ? (
                           <>
                             <span className="badge badge-brand">{t("ext.installed")}</span>
-                            <div className="tertiary-text">{formatDate(installedAt, params)}</div>
+                            {os.last_update && (
+                              <div className="tertiary-text">
+                                {t("ext.updatedAt", { date: formatDate(new Date(os.last_update * 1000), params) })}
+                              </div>
+                            )}
                           </>
                         ) : (
                           <span className="badge badge-grey">{t("ext.notInstalled")}</span>
                         )}
+                        {!row.catalog && <div className="tertiary-text">{t("ext.notInCatalog")}</div>}
                       </td>
                     )}
                     <td className="actions-col">
                       <div className="actions">
-                        {siteId && installedAt && (
+                        {os && (
                           <Link
-                            href={withContext(`/extensions/${encodeURIComponent(ext.id)}/settings`, params)}
+                            href={withContext(`/extensions/${encodeURIComponent(row.id)}/settings`, params)}
                             className="btn btn-secondary btn-small"
                           >
                             <Icon name="settings" />
                             {t("ext.colSettings")}
                           </Link>
                         )}
-                        {siteId && !installedAt && (
-                          <form action={installExtension}>
-                            <input type="hidden" name="id" value={ext.id} />
-                            <input type="hidden" name="site_id" value={siteId} />
-                            <button className="btn btn-secondary btn-small" type="submit">
-                              <Icon name="download" />
-                              {t("ext.install")}
-                            </button>
-                          </form>
-                        )}
                         <Link
-                          href={withContext("/", params, { ...view, edit: ext.id })}
+                          href={withContext("/", params, { ...view, edit: row.id })}
                           className="btn btn-icon"
                           title={t("common.edit")}
                           aria-label={t("common.edit")}
@@ -184,24 +253,14 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
                         >
                           <Icon name="edit" />
                         </Link>
-                        {siteId && installedAt && (
-                          <form action={uninstallExtension}>
-                            <input type="hidden" name="id" value={ext.id} />
-                            <input type="hidden" name="site_id" value={siteId} />
-                            <ConfirmButton
-                              message={t("ext.confirmUninstall", { name: ext.name, site: siteId })}
-                              title={t("ext.uninstall")}
-                            >
-                              <Icon name="remove" />
+                        {row.catalog && (
+                          <form action={deleteExtension}>
+                            <input type="hidden" name="id" value={row.id} />
+                            <ConfirmButton message={t("ext.confirmDelete", { name: row.name })} title={t("common.delete")}>
+                              <Icon name="trash" />
                             </ConfirmButton>
                           </form>
                         )}
-                        <form action={deleteExtension}>
-                          <input type="hidden" name="id" value={ext.id} />
-                          <ConfirmButton message={t("ext.confirmDelete", { name: ext.name })} title={t("common.delete")}>
-                            <Icon name="trash" />
-                          </ConfirmButton>
-                        </form>
                       </div>
                     </td>
                   </tr>
@@ -209,9 +268,7 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
               })}
             </tbody>
           </table>
-          {visible.length === 0 && !error && (
-            <Empty title={extensions.length ? t("ext.noResults") : t("ext.none")} />
-          )}
+          {visible.length === 0 && !error && <Empty title={all.length ? t("ext.noResults") : t("ext.none")} />}
         </div>
       </div>
 
@@ -258,7 +315,7 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
             </div>
             <div className="modal-footer">
               <Link href={here} className="btn btn-secondary" scroll={false}>{t("common.cancel")}</Link>
-              <button className="btn btn-primary" type="submit">{editing ? t("common.save") : t("ext.createBtn")}</button>
+              <button className="btn btn-primary" type="submit">{editing?.exists ? t("common.save") : t("ext.createBtn")}</button>
             </div>
           </form>
         </Modal>

@@ -202,3 +202,59 @@ function safeParse(s: string) {
     return s;
   }
 }
+
+// ---------- Écriture d'un appel ----------
+
+export type ApiCall = {
+  siteId?: string;
+  api: string;
+  method: string;
+  path: string;
+  status: number | null;
+  durationMs: number;
+  request?: unknown;
+  response?: unknown;
+  error?: string | null;
+  result?: string | null;
+};
+
+let logColumns: Promise<string[]> | null = null;
+
+/** Enregistre un appel dans api_logs, dans les colonnes qui existent (secrets masqués). */
+export async function logApiCall(call: ApiCall) {
+  logColumns ??= tableColumns(LOGS_TABLE).catch((e) => {
+    logColumns = null;
+    throw e;
+  });
+  const columns = await logColumns;
+  if (columns.length === 0) return;
+  const map = mapColumns(columns);
+
+  const json = (v: unknown) => (v === undefined || v === null ? null : JSON.stringify(maskSecrets(v)));
+  const values: Partial<Record<Role, unknown>> = {
+    time: new Date().toISOString(),
+    site: call.siteId ?? null,
+    api: call.api,
+    method: call.method,
+    path: maskSecrets(call.path),
+    status: call.status,
+    duration: call.durationMs,
+    request: json(call.request),
+    response: json(call.response),
+    error: call.error ? maskSecrets(call.error) : null,
+    result: call.result ?? null,
+  };
+  const cols: string[] = [];
+  const args: unknown[] = [];
+  for (const [role, value] of Object.entries(values) as [Role, unknown][]) {
+    const col = map[role];
+    if (!col || cols.includes(col)) continue;
+    cols.push(q(col));
+    args.push(value);
+  }
+  if (cols.length === 0) return;
+  await getSql().query(
+    `INSERT INTO ${LOGS_TABLE} (${cols.join(", ")}) VALUES (${cols.map((_, i) => `$${i + 1}`).join(", ")})`,
+    args,
+  );
+}

@@ -8,14 +8,6 @@ CREATE TABLE IF NOT EXISTS extensions (
 );
 ALTER TABLE extensions ADD COLUMN IF NOT EXISTS description TEXT;
 
--- Extensions installées par site
-CREATE TABLE IF NOT EXISTS site_extensions (
-  site_id      TEXT NOT NULL,
-  extension_id TEXT NOT NULL REFERENCES extensions (id) ON DELETE CASCADE,
-  installed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (site_id, extension_id)
-);
-
 -- Journal des appels API (créé seulement s'il n'existe pas déjà)
 CREATE TABLE IF NOT EXISTS api_logs (
   id          BIGSERIAL PRIMARY KEY,

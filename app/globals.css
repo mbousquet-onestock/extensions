@@ -278,3 +278,12 @@ pre.code { margin: 6px 0 0; padding: 8px; background: var(--neutral-30); border-
 .check input { width: 16px; height: 16px; accent-color: var(--primary-1000); margin: 0; }
 .page-header .intro { max-width: 760px; }
 .page-header .intro strong { font-weight: 500; color: var(--text-primary); }
+
+/* ---------- Extensions ---------- */
+.ext-name { display: flex; align-items: flex-start; gap: var(--spacing-l); }
+.ext-icon { width: 36px; height: 36px; flex: none; border-radius: var(--radius-m); object-fit: contain; background: #fff; border: 1px solid var(--border-primary); }
+.ext-icon.placeholder { display: inline-flex; align-items: center; justify-content: center; color: var(--primary-1000); background: rgba(36, 189, 176, 0.1); border-color: transparent; }
+.ext-icon.large { width: 48px; height: 48px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag-sub { margin-left: 6px; padding-left: 6px; border-left: 1px solid rgba(81, 91, 96, 0.3); font-weight: 400; color: var(--text-secondary); }
+.link-ext { display: inline-flex; align-items: center; gap: 4px; margin-right: 12px; font-weight: 500; }
