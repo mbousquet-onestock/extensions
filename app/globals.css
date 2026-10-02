@@ -83,3 +83,5 @@ dd { margin: 0; overflow-wrap: anywhere; }
 h2 { font-size: 15px; margin: 0 0 12px; }
 .section-title { display: flex; justify-content: space-between; align-items: baseline; margin: 24px 0 8px; }
 .section-title h2 { margin: 0; }
+tr.muted td { opacity: .55; }
+.row a.active { font-weight: 600; }

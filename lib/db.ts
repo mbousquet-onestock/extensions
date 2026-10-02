@@ -49,60 +49,10 @@ export type Extension = {
 
 export type Row = Record<string, unknown>;
 
-const IDENT = /^[a-z_][a-z0-9_]*$/i;
-
-export function quoteIdent(name: string) {
-  if (!IDENT.test(name)) throw new Error(`Nom de table ou colonne invalide : ${name}`);
-  return `"${name}"`;
-}
-
 export async function tableColumns(table: string) {
   const rows = await getSql()`
     SELECT column_name FROM information_schema.columns
     WHERE table_name = ${table} AND table_schema = current_schema()
     ORDER BY ordinal_position`;
   return rows.map((r) => r.column_name as string);
-}
-
-/**
- * Lit les lignes d'une table existante en filtrant sur les colonnes connues.
- * Un filtre dont la colonne n'existe pas dans la table est ignoré ;
- * une valeur `null` filtre sur `IS NULL`.
- */
-export async function readTable(table: string, filters: Record<string, string | null | undefined>) {
-  const columns = await tableColumns(table);
-  if (columns.length === 0) return { exists: false, columns, rows: [] as Row[], applied: [] as string[] };
-
-  const where: string[] = [];
-  const args: unknown[] = [];
-  const applied: string[] = [];
-  for (const [column, value] of Object.entries(filters)) {
-    if (value === undefined || !columns.includes(column)) continue;
-    applied.push(column);
-    if (value === null) {
-      where.push(`${quoteIdent(column)} IS NULL`);
-    } else {
-      args.push(value);
-      where.push(`${quoteIdent(column)}::text = $${args.length}`);
-    }
-  }
-  const order = ["key", "name", "id"].find((c) => columns.includes(c));
-  const rows = (await getSql().query(
-    `SELECT * FROM ${quoteIdent(table)}
-     ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
-     ${order ? `ORDER BY ${quoteIdent(order)}` : ""}
-     LIMIT 1000`,
-    args,
-  )) as Row[];
-  return { exists: true, columns, rows, applied };
-}
-
-export const SETTINGS_TABLE = process.env.SETTINGS_TABLE || "settings";
-export const GENERAL_SETTINGS_TABLE = process.env.GENERAL_SETTINGS_TABLE || "general_settings";
-
-export async function listTables() {
-  const rows = await getSql()`
-    SELECT table_name FROM information_schema.tables
-    WHERE table_schema = current_schema() ORDER BY table_name`;
-  return rows.map((r) => r.table_name as string);
 }
