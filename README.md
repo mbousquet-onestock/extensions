@@ -45,3 +45,11 @@ npm install
 npm run db:migrate
 npm run dev
 ```
+
+## Utiliser `onestock_token` depuis une autre application
+
+Les valeurs sensibles sont stockées chiffrées (`enc:v1:…`). Une autre application qui lit la même table `settings` doit les déchiffrer avec la **même clé** :
+
+1. Partager `SETTINGS_ENCRYPTION_KEY` avec ses projets Vercel (variable d'environnement partagée de l'équipe, reliée à chaque projet).
+2. Copier `shared/settings-secrets.mjs` (autonome, sans dépendance) et appeler `decryptSetting(row.value)` sur la valeur lue. Une valeur encore en clair est renvoyée telle quelle : le module peut être déployé avant la migration.
+3. Une fois toutes les applications à jour, lancer `npm run secrets:encrypt`.
