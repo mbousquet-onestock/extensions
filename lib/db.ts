@@ -86,3 +86,24 @@ export async function tableColumns(table: string) {
     ORDER BY ordinal_position`;
   return rows.map((r) => r.column_name as string);
 }
+
+const writable = new Map<string, Promise<boolean>>();
+
+/** Faux si la colonne n'existe pas ou si elle est générée / identité « ALWAYS » (non modifiable). */
+export function isWritableColumn(table: string, column: string) {
+  const id = `${table}.${column}`;
+  if (!writable.has(id)) {
+    writable.set(
+      id,
+      getSql()`
+        SELECT is_generated, is_identity, identity_generation FROM information_schema.columns
+        WHERE table_name = ${table} AND column_name = ${column} AND table_schema = current_schema()`
+        .then(([c]) => !!c && c.is_generated !== "ALWAYS" && !(c.is_identity === "YES" && c.identity_generation === "ALWAYS"))
+        .catch((e) => {
+          writable.delete(id);
+          throw e;
+        }),
+    );
+  }
+  return writable.get(id)!;
+}

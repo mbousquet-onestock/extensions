@@ -1,4 +1,4 @@
-import { getSql, tableColumns } from "@/lib/db";
+import { getSql, isWritableColumn, tableColumns } from "@/lib/db";
 import { summarizeError } from "@/lib/payload";
 
 export const LOGS_TABLE = "api_logs";
@@ -249,7 +249,7 @@ export async function logApiCall(call: ApiCall) {
   const args: unknown[] = [];
   for (const [role, value] of Object.entries(values) as [Role, unknown][]) {
     const col = map[role];
-    if (!col || cols.includes(col)) continue;
+    if (!col || cols.includes(q(col)) || !(await isWritableColumn(LOGS_TABLE, col))) continue;
     cols.push(q(col));
     args.push(value);
   }

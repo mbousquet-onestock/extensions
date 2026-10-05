@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { clearLogs } from "@/lib/apiLogs";
 import { randomUUID } from "node:crypto";
 import { encryptSecret, isSecretKey, MissingKeyError } from "@/lib/secrets";
-import { ensureSchema, getSql, nameKey, type CatalogInjectionPoint } from "@/lib/db";
+import { ensureSchema, getSql, isWritableColumn, nameKey, type CatalogInjectionPoint } from "@/lib/db";
 
 function text(form: FormData, key: string) {
   return String(form.get(key) ?? "").trim();
@@ -120,24 +120,30 @@ export async function saveSetting(form: FormData) {
   }
 
   const sql = getSql();
+  // `scope` peut être une colonne générée (calculée par la base à partir d'extension_id) : on ne l'écrit pas alors.
+  const writeScope = await isWritableColumn("settings", "scope");
   try {
     if (original) {
       const o = JSON.parse(original) as { key: string; site_id: string; extension_id: string; environment: string };
       if (secret && !value) {
-        await sql`
-          UPDATE settings SET scope = ${scope}, updated_at = now()
-          WHERE key = ${o.key} AND site_id = ${o.site_id}
-            AND extension_id = ${o.extension_id} AND environment = ${o.environment}`;
+        await sql.query(
+          `UPDATE settings SET ${writeScope ? "scope = $5, " : ""}updated_at = now()
+           WHERE key = $1 AND site_id = $2 AND extension_id = $3 AND environment = $4`,
+          [o.key, o.site_id, o.extension_id, o.environment, ...(writeScope ? [scope] : [])],
+        );
       } else {
-        await sql`
-          UPDATE settings SET value = ${stored}, scope = ${scope}, updated_at = now()
-          WHERE key = ${o.key} AND site_id = ${o.site_id}
-            AND extension_id = ${o.extension_id} AND environment = ${o.environment}`;
+        await sql.query(
+          `UPDATE settings SET value = $5, ${writeScope ? "scope = $6, " : ""}updated_at = now()
+           WHERE key = $1 AND site_id = $2 AND extension_id = $3 AND environment = $4`,
+          [o.key, o.site_id, o.extension_id, o.environment, stored, ...(writeScope ? [scope] : [])],
+        );
       }
     } else {
-      await sql`
-        INSERT INTO settings (key, value, site_id, extension_id, environment, scope, updated_at)
-        VALUES (${key}, ${stored}, ${siteId}, ${extensionId}, ${environment}, ${scope}, now())`;
+      await sql.query(
+        `INSERT INTO settings (key, value, site_id, extension_id, environment, ${writeScope ? "scope, " : ""}updated_at)
+         VALUES ($1, $2, $3, $4, $5, ${writeScope ? "$6, " : ""}now())`,
+        [key, stored, siteId, extensionId, environment, ...(writeScope ? [scope] : [])],
+      );
     }
   } catch (e) {
     const code = (e as { code?: string }).code;
