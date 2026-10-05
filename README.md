@@ -4,6 +4,14 @@ App Next.js (déployée sur Vercel) chargée en iframe dans OneStock comme UI ex
 
 - **Contexte** : récupère les paramètres d'URL envoyés par OneStock (`site_id`, `extension_id`, `user_id`, `lang`, `host_app`, `parent_url`, …), fait le handshake `extension_ready` → `onestock_data` par postMessage et vérifie `extension_signature` (HMAC-SHA256 de `${t}.${extension_id}##${user_id}`, valable 6 h) côté serveur. Le contexte est affiché en haut de chaque page et conservé dans les liens. Hors OneStock, on peut saisir un `site_id` à la main.
 - **Extensions** (`/`) : les extensions installées sur le `site_id` du contexte viennent de l'API OneStock — `POST {onestock_api_root}/extensions/query` puis `GET {onestock_api_root}/extensions/{id}` (corps `{ site_id, token }`, token = setting global `onestock_token`) : icône, points d'injection, URL de production / test, dernière mise à jour. Elles sont rapprochées du catalogue commun en base **par le nom** (l'id OneStock est généré à la création sur chaque environnement) ; un badge signale les champs qui diffèrent (url, test_url, icon, injection_points). La modale de modification affiche toutes les données de l'API (id, dates, URL, icônes, points d'injection, JSON complet) à côté du formulaire du catalogue ; une extension installée hors catalogue peut y être ajoutée en un clic, formulaire prérempli. La création reprend les champs de l'API : nom, icône (base64, 100 Ko max), url, test_url et points d'injection (anchor, name, slug, path, icône). Chaque appel est enregistré dans `api_logs` (token masqué, icônes base64 remplacées par un libellé).
+
+  Actions sur chaque ligne (avec confirmation pour l'environnement) :
+  - **Installer sur l'environnement** (extension du catalogue non installée) : `POST {onestock_api_root}/extensions` avec `{ site_id, token, extension: { name, icon, url, test_url, injection_points } }` ;
+  - **Désinstaller de l'environnement** : `DELETE {onestock_api_root}/extensions/{id}` avec `{ site_id, token }` ;
+  - **Ajouter au catalogue** (extension installée hors catalogue) : copie toutes ses données OneStock dans la base ;
+  - **Supprimer du catalogue** : n'affecte pas les installations.
+
+  Ces deux endpoints ne sont pas dans la documentation OneStock : ils suivent les conventions de `/extensions/query` et `/extensions/{id}` et sont regroupés dans `createExtension` / `deleteRemoteExtension` (`lib/onestock.ts`) pour être ajustés si besoin.
 - **Settings d'une extension** (`/extensions/<id>/settings`) : lignes de la table `settings` dont `extension_id` est l'id OneStock de l'extension ou le slug d'un de ses points d'injection.
 - **Settings généraux** (`/settings`) : lignes de `settings` avec `scope = 'global'` (ou `extension_id = '*'`).
 

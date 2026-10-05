@@ -3,9 +3,17 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { clearLogs } from "@/lib/apiLogs";
+import {
+  createExtension,
+  deleteRemoteExtension,
+  getCredentials,
+  getExtension,
+  type OneStockExtension,
+} from "@/lib/onestock";
+import { summarizeError } from "@/lib/payload";
 import { randomUUID } from "node:crypto";
 import { encryptSecret, isSecretKey, MissingKeyError } from "@/lib/secrets";
-import { ensureSchema, getSql, isWritableColumn, nameKey, type CatalogInjectionPoint } from "@/lib/db";
+import { ensureSchema, getSql, isWritableColumn, nameKey, readCatalog, type CatalogInjectionPoint } from "@/lib/db";
 
 function text(form: FormData, key: string) {
   return String(form.get(key) ?? "").trim();
@@ -70,6 +78,90 @@ export async function deleteExtension(form: FormData) {
   await ensureSchema();
   await getSql()`DELETE FROM extensions WHERE id = ${id}`;
   revalidatePath("/");
+  redirect(backWith(text(form, "back"), { done: "deleted", name: text(form, "name") }));
+}
+
+// ---------- Environnement OneStock ----------
+
+async function credentialsFor(form: FormData) {
+  const siteId = text(form, "site_id");
+  if (!siteId) return null;
+  const creds = await getCredentials(siteId, text(form, "parent_url") || null);
+  return creds ? { creds, siteId } : null;
+}
+
+/** Message d'erreur API sur une ligne : `401 · auth_error — the token is expired or invalid`. */
+const apiError = (e: unknown) => summarizeError((e as Error).message).slice(0, 300);
+
+/** Installe une extension du catalogue sur l'environnement (API OneStock). */
+export async function installOnEnvironment(form: FormData) {
+  const back = text(form, "back");
+  const name = text(form, "name");
+  const ctx = await credentialsFor(form);
+  if (!ctx) redirect(backWith(back, { action_error: "no_credentials" }));
+
+  const [ext] = (await readCatalog()).filter((c) => c.id === text(form, "id"));
+  if (!ext) redirect(backWith(back, { action_error: "not_in_catalog" }));
+
+  let error: string | null = null;
+  try {
+    await createExtension(ctx!.creds, ctx!.siteId, ext!);
+  } catch (e) {
+    error = apiError(e);
+  }
+  revalidatePath("/");
+  redirect(backWith(back, error ? { action_error: error } : { done: "installed", name }));
+}
+
+/** Supprime une extension de l'environnement (API OneStock). */
+export async function uninstallFromEnvironment(form: FormData) {
+  const back = text(form, "back");
+  const name = text(form, "name");
+  const ctx = await credentialsFor(form);
+  if (!ctx) redirect(backWith(back, { action_error: "no_credentials" }));
+
+  let error: string | null = null;
+  try {
+    await deleteRemoteExtension(ctx!.creds, ctx!.siteId, text(form, "os_id"));
+  } catch (e) {
+    error = apiError(e);
+  }
+  revalidatePath("/");
+  redirect(backWith(back, error ? { action_error: error } : { done: "uninstalled", name }));
+}
+
+/** Ajoute au catalogue une extension installée, avec toutes ses données OneStock. */
+export async function addToCatalog(form: FormData) {
+  const back = text(form, "back");
+  const ctx = await credentialsFor(form);
+  if (!ctx) redirect(backWith(back, { action_error: "no_credentials" }));
+
+  let ext: OneStockExtension | null = null;
+  try {
+    ext = await getExtension(ctx!.creds, ctx!.siteId, text(form, "os_id"));
+  } catch (e) {
+    redirect(backWith(back, { action_error: apiError(e) }));
+  }
+  if (!ext?.name) redirect(backWith(back, { action_error: "not_found" }));
+
+  await ensureSchema();
+  const sql = getSql();
+  const [dup] = await sql`SELECT id FROM extensions WHERE lower(trim(name)) = ${nameKey(ext!.name)}`;
+  if (dup) redirect(backWith(back, { action_error: "duplicate_name" }));
+
+  const points = (ext!.injection_points ?? []).map((p) => ({
+    anchor: p.anchor,
+    ...(p.name && { name: p.name }),
+    ...(p.slug && { slug: p.slug }),
+    ...(p.path && { path: p.path }),
+    ...(p.icon && { icon: p.icon }),
+  }));
+  await sql`
+    INSERT INTO extensions (id, name, icon, url, test_url, injection_points, installation_point)
+    VALUES (${randomUUID()}, ${ext!.name}, ${ext!.icon ?? null}, ${ext!.url ?? null}, ${ext!.test_url ?? null},
+      ${JSON.stringify(points)}::jsonb, ${points[0]?.anchor ?? null})`;
+  revalidatePath("/");
+  redirect(backWith(back, { done: "cataloged", name: ext!.name }));
 }
 
 export async function clearLogsAction(form: FormData) {
@@ -81,7 +173,7 @@ export async function clearLogsAction(form: FormData) {
 
 function backWith(back: string, extra: Record<string, string>) {
   const url = new URL(back.startsWith("/") ? back : "/", "http://x");
-  for (const k of ["edit", "new", "edit_key", "edit_site", "edit_ext", "edit_env", "saved", "error", "purged", "cleared"]) url.searchParams.delete(k);
+  for (const k of ["edit", "new", "edit_key", "edit_site", "edit_ext", "edit_env", "saved", "error", "purged", "cleared", "done", "name", "action_error"]) url.searchParams.delete(k);
   for (const [k, v] of Object.entries(extra)) url.searchParams.set(k, v);
   return `${url.pathname}${url.search}`;
 }

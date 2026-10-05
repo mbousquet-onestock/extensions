@@ -100,9 +100,15 @@ function stripImages(value: unknown): unknown {
 }
 
 /** Appelle l'API OneStock avec `{ site_id, token }` et journalise l'appel dans api_logs. */
-export async function callOneStock<T>(creds: Credentials, siteId: string, method: "GET" | "POST", path: string) {
+export async function callOneStock<T>(
+  creds: Credentials,
+  siteId: string,
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
+  path: string,
+  extra: Record<string, unknown> = {},
+) {
   const url = `${apiBase(creds.apiRoot)}${path}`;
-  const body = { site_id: siteId, token: creds.token };
+  const body = { site_id: siteId, token: creds.token, ...extra };
   const started = Date.now();
   let status: number | null = null;
   let parsed: unknown = undefined;
@@ -128,7 +134,7 @@ export async function callOneStock<T>(creds: Credentials, siteId: string, method
     path: url,
     status,
     durationMs: Date.now() - started,
-    request: { site_id: siteId, token: creds.token },
+    request: stripImages(body),
     response: error ? null : stripImages(parsed),
     error,
     result: error ? null : summarize(parsed),
@@ -195,4 +201,38 @@ export function iconSrc(icon?: string) {
   if (icon.startsWith("data:") || icon.startsWith("http")) return icon;
   const type = icon.startsWith("iVBOR") ? "png" : icon.startsWith("R0lGOD") ? "gif" : icon.startsWith("PHN2") ? "svg+xml" : "jpeg";
   return `data:image/${type};base64,${icon}`;
+}
+
+// ---------- Installation / désinstallation sur l'environnement ----------
+// Endpoints non documentés publiquement : mêmes conventions que /extensions/query et /extensions/{id}.
+// Si l'API attend un autre format, seules ces deux fonctions sont à adapter.
+
+export type ExtensionPayload = {
+  name: string;
+  icon?: string | null;
+  url?: string | null;
+  test_url?: string | null;
+  injection_points?: InjectionPoint[];
+};
+
+/** Retire les champs vides pour n'envoyer que ce qui est renseigné. */
+function compact<T extends Record<string, unknown>>(o: T) {
+  return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== null && v !== undefined && v !== "")) as Partial<T>;
+}
+
+/** Crée l'extension sur l'environnement : `POST {url}/extensions` avec `{ site_id, token, extension }`. */
+export async function createExtension(creds: Credentials, siteId: string, ext: ExtensionPayload) {
+  const extension = compact({
+    name: ext.name,
+    icon: ext.icon,
+    url: ext.url,
+    test_url: ext.test_url,
+    injection_points: (ext.injection_points ?? []).map((p) => compact({ ...p })),
+  });
+  return callOneStock<{ id?: string; extension?: { id?: string } }>(creds, siteId, "POST", "/extensions", { extension });
+}
+
+/** Supprime l'extension de l'environnement : `DELETE {url}/extensions/{id}` avec `{ site_id, token }`. */
+export async function deleteRemoteExtension(creds: Credentials, siteId: string, id: string) {
+  return callOneStock(creds, siteId, "DELETE", `/extensions/${encodeURIComponent(id)}`);
 }

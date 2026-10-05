@@ -10,13 +10,15 @@ import { nameKey, readCatalog, type Extension } from "@/lib/db";
 import { formatDate, getT, type MessageKey } from "@/lib/i18n";
 import { getCredentials, getInstalledExtensions, iconSrc, type OneStockExtension } from "@/lib/onestock";
 import { summarizeError } from "@/lib/payload";
-import { deleteExtension, saveExtension } from "./actions";
+import { addToCatalog, deleteExtension, installOnEnvironment, saveExtension, uninstallFromEnvironment } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 type Search = Record<string, string | undefined>;
 const STATUSES = ["all", "installed", "not_installed"] as const;
 const DEFAULT_POINTS = ["bo.page", "bo.order.action", "bo.orders.action"];
+const DONE_KEYS = ["installed", "uninstalled", "cataloged", "deleted"] as const;
+const ACTION_ERRORS = ["no_credentials", "not_in_catalog", "not_found", "duplicate_name"] as const;
 
 type Row = {
   key: string;
@@ -40,6 +42,18 @@ function differences(c: Extension, os: OneStockExtension) {
   if ((c.icon ?? "") !== (os.icon ?? "")) diff.push("icon");
   if (pointsSig(c.injection_points) !== pointsSig(os.injection_points)) diff.push("injection_points");
   return diff;
+}
+
+/** Champs communs aux actions de ligne : retour, site et contexte pour retrouver les identifiants API. */
+function ActionFields({ params, back, name }: { params: Search; back: string; name: string }) {
+  return (
+    <>
+      <input type="hidden" name="back" value={back} />
+      <input type="hidden" name="name" value={name} />
+      <input type="hidden" name="site_id" value={params.site_id ?? ""} />
+      <input type="hidden" name="parent_url" value={params.parent_url ?? ""} />
+    </>
+  );
 }
 
 export default async function ExtensionsPage({ searchParams }: { searchParams: Promise<Search> }) {
@@ -170,6 +184,16 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
       {error && <Alert type="danger">{t("common.dbError", { error })}</Alert>}
       {!siteId && <Alert type="info">{t("ext.noSite")}</Alert>}
       {apiProblem && <Alert type="danger">{apiProblem}</Alert>}
+      {params.done && DONE_KEYS.includes(params.done as never) && (
+        <Alert type="success">{t(`ext.done.${params.done}` as MessageKey, { name: params.name ?? "" })}</Alert>
+      )}
+      {params.action_error && (
+        <Alert type="danger">
+          {ACTION_ERRORS.includes(params.action_error as never)
+            ? t(`ext.actionError.${params.action_error}` as MessageKey, { site: siteId })
+            : t("ext.apiError", { error: params.action_error })}
+        </Alert>
+      )}
 
       <div className="card flush">
         <div className="toolbar">
@@ -294,6 +318,21 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
                             {t("ext.colSettings")}
                           </Link>
                         )}
+                        {/* Environnement OneStock : installer une extension du catalogue */}
+                        {siteId && environment && !os && row.catalog && (
+                          <form action={installOnEnvironment}>
+                            <ActionFields params={params} back={here} name={row.name} />
+                            <input type="hidden" name="id" value={row.catalog.id} />
+                            <ConfirmButton
+                              className="btn btn-secondary btn-small"
+                              message={t("ext.confirmInstallEnv", { name: row.name, env: environment, site: siteId })}
+                              title={t("ext.installEnvTitle", { env: environment })}
+                            >
+                              <Icon name="download" />
+                              {t("ext.install")}
+                            </ConfirmButton>
+                          </form>
+                        )}
                         <Link
                           href={withContext("/", params, { ...view, edit: row.key })}
                           className="btn btn-icon"
@@ -303,11 +342,36 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
                         >
                           <Icon name="edit" />
                         </Link>
+                        {/* Catalogue (base Vercel) : ajouter une extension installée / supprimer */}
+                        {os && !row.catalog && (
+                          <form action={addToCatalog}>
+                            <ActionFields params={params} back={here} name={row.name} />
+                            <input type="hidden" name="os_id" value={os.id} />
+                            <button type="submit" className="btn btn-icon brand" title={t("ext.addToCatalog")} aria-label={t("ext.addToCatalog")}>
+                              <Icon name="bookmark" />
+                            </button>
+                          </form>
+                        )}
                         {row.catalog && (
                           <form action={deleteExtension}>
+                            <input type="hidden" name="back" value={here} />
+                            <input type="hidden" name="name" value={row.name} />
                             <input type="hidden" name="id" value={row.catalog.id} />
-                            <ConfirmButton message={t("ext.confirmDelete", { name: row.name })} title={t("common.delete")}>
+                            <ConfirmButton message={t("ext.confirmDelete", { name: row.name })} title={t("ext.removeCatalog")}>
                               <Icon name="trash" />
+                            </ConfirmButton>
+                          </form>
+                        )}
+                        {/* Environnement OneStock : désinstaller */}
+                        {os && environment && (
+                          <form action={uninstallFromEnvironment}>
+                            <ActionFields params={params} back={here} name={row.name} />
+                            <input type="hidden" name="os_id" value={os.id} />
+                            <ConfirmButton
+                              message={t("ext.confirmUninstallEnv", { name: row.name, env: environment, site: siteId })}
+                              title={t("ext.uninstallEnvTitle", { env: environment })}
+                            >
+                              <Icon name="unplug" />
                             </ConfirmButton>
                           </form>
                         )}
