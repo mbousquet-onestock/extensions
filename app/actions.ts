@@ -47,6 +47,7 @@ export async function saveExtension(form: FormData) {
     icon: text(form, "icon") || null,
     url: text(form, "url") || null,
     test_url: text(form, "test_url") || null,
+    rank: Number.isInteger(Number(text(form, "rank"))) && text(form, "rank") !== "" ? Number(text(form, "rank")) : null,
     points: JSON.stringify(points),
   };
 
@@ -60,14 +61,14 @@ export async function saveExtension(form: FormData) {
   if (id) {
     await sql`
       UPDATE extensions SET name = ${values.name}, description = ${values.description}, icon = ${values.icon},
-        url = ${values.url}, test_url = ${values.test_url}, injection_points = ${values.points}::jsonb,
+        url = ${values.url}, test_url = ${values.test_url}, rank = ${values.rank}, injection_points = ${values.points}::jsonb,
         installation_point = ${points[0]?.anchor ?? null}, updated_at = now()
       WHERE id = ${id}`;
   } else {
     await sql`
-      INSERT INTO extensions (id, name, description, icon, url, test_url, injection_points, installation_point)
+      INSERT INTO extensions (id, name, description, icon, url, test_url, rank, injection_points, installation_point)
       VALUES (${randomUUID()}, ${values.name}, ${values.description}, ${values.icon}, ${values.url},
-        ${values.test_url}, ${values.points}::jsonb, ${points[0]?.anchor ?? null})`;
+        ${values.test_url}, ${values.rank}, ${values.points}::jsonb, ${points[0]?.anchor ?? null})`;
   }
   revalidatePath("/");
   redirect(backWith(back, { saved: "1" }));
@@ -157,8 +158,8 @@ export async function addToCatalog(form: FormData) {
     ...(p.icon && { icon: p.icon }),
   }));
   await sql`
-    INSERT INTO extensions (id, name, icon, url, test_url, injection_points, installation_point)
-    VALUES (${randomUUID()}, ${ext!.name}, ${ext!.icon ?? null}, ${ext!.url ?? null}, ${ext!.test_url ?? null},
+    INSERT INTO extensions (id, name, icon, url, test_url, rank, injection_points, installation_point)
+    VALUES (${randomUUID()}, ${ext!.name}, ${ext!.icon ?? null}, ${ext!.url ?? null}, ${ext!.test_url ?? null}, ${ext!.rank ?? null},
       ${JSON.stringify(points)}::jsonb, ${points[0]?.anchor ?? null})`;
   revalidatePath("/");
   redirect(backWith(back, { done: "cataloged", name: ext!.name }));

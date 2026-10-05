@@ -6,7 +6,7 @@ App Next.js (déployée sur Vercel) chargée en iframe dans OneStock comme UI ex
 - **Extensions** (`/`) : les extensions installées sur le `site_id` du contexte viennent de l'API OneStock — `POST {onestock_api_root}/extensions/query` puis `GET {onestock_api_root}/extensions/{id}` (corps `{ site_id, token }`, token = setting global `onestock_token`) : icône, points d'injection, URL de production / test, dernière mise à jour. Elles sont rapprochées du catalogue commun en base **par le nom** (l'id OneStock est généré à la création sur chaque environnement) ; un badge signale les champs qui diffèrent (url, test_url, icon, injection_points). La modale de modification affiche toutes les données de l'API (id, dates, URL, icônes, points d'injection, JSON complet) à côté du formulaire du catalogue ; une extension installée hors catalogue peut y être ajoutée en un clic, formulaire prérempli. La création reprend les champs de l'API : nom, icône (base64, 100 Ko max), url, test_url et points d'injection (anchor, name, slug, path, icône). Chaque appel est enregistré dans `api_logs` (token masqué, icônes base64 remplacées par un libellé).
 
   Actions sur chaque ligne (avec confirmation pour l'environnement) :
-  - **Installer sur l'environnement** (extension du catalogue non installée) : `POST {onestock_api_root}/extensions` avec `{ site_id, token, extension: { name, icon, url, test_url, injection_points } }` ;
+  - **Installer sur l'environnement** (extension du catalogue non installée) : `POST {onestock_api_root}/extensions` avec `{ site_id, token, extension: { rank, icon, name, url, test_url, injection_points: [{ name, path, icon, anchor, slug }] } }` (champs vides non envoyés, `rank` = 1 par défaut) ;
   - **Désinstaller de l'environnement** : `DELETE {onestock_api_root}/extensions/{id}` avec `{ site_id, token }` ;
   - **Ajouter au catalogue** (extension installée hors catalogue) : copie toutes ses données OneStock dans la base ;
   - **Supprimer du catalogue** : n'affecte pas les installations.
@@ -31,7 +31,7 @@ L'interface applique le design system OneStock (`@onestock-public/design-system`
 
 Créées automatiquement au premier accès (ou via `npm run db:migrate`) :
 
-- `extensions` (`id` interne, `name` unique, `description`, `icon`, `url`, `test_url`, `injection_points` JSONB)
+- `extensions` (`id` interne, `name` unique, `description`, `icon`, `url`, `test_url`, `rank`, `injection_points` JSONB)
 
 Table existante utilisée : `settings` (`key`, `value`, `updated_at`, `site_id`, `extension_id`, `environment`, `scope`).
 

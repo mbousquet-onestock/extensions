@@ -39,6 +39,7 @@ function differences(c: Extension, os: OneStockExtension) {
   const diff: string[] = [];
   if ((c.url ?? "") !== (os.url ?? "")) diff.push("url");
   if ((c.test_url ?? "") !== (os.test_url ?? "")) diff.push("test_url");
+  if (c.rank != null && os.rank != null && c.rank !== os.rank) diff.push("rank");
   if ((c.icon ?? "") !== (os.icon ?? "")) diff.push("icon");
   if (pointsSig(c.injection_points) !== pointsSig(os.injection_points)) diff.push("injection_points");
   return diff;
@@ -147,6 +148,7 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
     icon: source?.icon ?? "",
     url: source?.url ?? "",
     test_url: source?.test_url ?? "",
+    rank: source?.rank != null ? String(source.rank) : "",
     injection_points: (source?.injection_points ?? []).map((p) => ({
       anchor: p.anchor,
       name: p.name ?? "",
@@ -159,7 +161,7 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
     params.error === "duplicate_name" || params.error === "required" ? t(`ext.${params.error}` as MessageKey) : params.error;
   const formLabels = {
     name: t("form.name"), nameHelp: t("form.nameHelp"), description: t("form.description"), icon: t("form.icon"),
-    url: t("form.url"), testUrl: t("form.testUrl"), points: t("form.points"), anchor: t("form.anchor"),
+    url: t("form.url"), testUrl: t("form.testUrl"), rank: t("form.rank"), rankHelp: t("form.rankHelp"), points: t("form.points"), anchor: t("form.anchor"),
     pointName: t("form.pointName"), slug: t("form.slug"), path: t("form.path"), addPoint: t("form.addPoint"),
     removePoint: t("form.removePoint"), chooseIcon: t("form.chooseIcon"), removeIcon: t("form.removeIcon"),
     iconHelp: t("form.iconHelp"), iconTooBig: t("form.iconTooBig"), noPoints: t("form.noPoints"),

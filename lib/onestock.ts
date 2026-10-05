@@ -163,6 +163,7 @@ export type OneStockExtension = {
   icon?: string;
   url?: string;
   test_url?: string;
+  rank?: number;
   creation_date?: number;
   last_update?: number;
   injection_points?: InjectionPoint[];
@@ -212,6 +213,7 @@ export type ExtensionPayload = {
   icon?: string | null;
   url?: string | null;
   test_url?: string | null;
+  rank?: number | null;
   injection_points?: InjectionPoint[];
 };
 
@@ -222,7 +224,9 @@ function compact<T extends Record<string, unknown>>(o: T) {
 
 /** Crée l'extension sur l'environnement : `POST {url}/extensions` avec `{ site_id, token, extension }`. */
 export async function createExtension(creds: Credentials, siteId: string, ext: ExtensionPayload) {
+  // Format attendu par OneStock : { rank, icon, name, url, injection_points: [{ name, path, icon, anchor }] }
   const extension = compact({
+    rank: ext.rank ?? 1,
     name: ext.name,
     icon: ext.icon,
     url: ext.url,

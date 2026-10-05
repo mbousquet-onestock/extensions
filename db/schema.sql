@@ -11,6 +11,7 @@ ALTER TABLE extensions ADD COLUMN IF NOT EXISTS description TEXT;
 ALTER TABLE extensions ADD COLUMN IF NOT EXISTS icon TEXT;                -- image base64
 ALTER TABLE extensions ADD COLUMN IF NOT EXISTS url TEXT;
 ALTER TABLE extensions ADD COLUMN IF NOT EXISTS test_url TEXT;
+ALTER TABLE extensions ADD COLUMN IF NOT EXISTS rank INTEGER;                -- ordre d'affichage OneStock
 ALTER TABLE extensions ADD COLUMN IF NOT EXISTS injection_points JSONB NOT NULL DEFAULT '[]'::jsonb; -- [{anchor, name, slug, path, icon}]
 ALTER TABLE extensions ALTER COLUMN installation_point DROP NOT NULL;
 

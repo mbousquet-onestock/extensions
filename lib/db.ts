@@ -30,6 +30,7 @@ export function ensureSchema() {
     await sql`ALTER TABLE extensions ADD COLUMN IF NOT EXISTS icon TEXT`;
     await sql`ALTER TABLE extensions ADD COLUMN IF NOT EXISTS url TEXT`;
     await sql`ALTER TABLE extensions ADD COLUMN IF NOT EXISTS test_url TEXT`;
+    await sql`ALTER TABLE extensions ADD COLUMN IF NOT EXISTS rank INTEGER`;
     await sql`ALTER TABLE extensions ADD COLUMN IF NOT EXISTS injection_points JSONB NOT NULL DEFAULT '[]'::jsonb`;
     await sql`ALTER TABLE extensions ALTER COLUMN installation_point DROP NOT NULL`;
   })().catch((e) => {
@@ -49,6 +50,8 @@ export type Extension = {
   icon: string | null;
   url: string | null;
   test_url: string | null;
+  /** Ordre d'affichage dans OneStock (`rank`). */
+  rank: number | null;
   injection_points: CatalogInjectionPoint[];
   updated_at?: Date;
 };
@@ -59,7 +62,7 @@ export const nameKey = (name: string | null | undefined) => (name ?? "").trim().
 export async function readCatalog(): Promise<Extension[]> {
   await ensureSchema();
   const rows = await getSql()`
-    SELECT id, name, description, icon, url, test_url, injection_points, installation_point, updated_at
+    SELECT id, name, description, icon, url, test_url, rank, injection_points, installation_point, updated_at
     FROM extensions ORDER BY name`;
   return rows.map((r) => {
     const points = Array.isArray(r.injection_points) ? (r.injection_points as CatalogInjectionPoint[]) : [];
@@ -70,6 +73,7 @@ export async function readCatalog(): Promise<Extension[]> {
       icon: r.icon,
       url: r.url,
       test_url: r.test_url,
+      rank: r.rank ?? null,
       updated_at: r.updated_at,
       // Anciennes lignes : un seul point d'installation.
       injection_points: points.length || !r.installation_point ? points : [{ anchor: r.installation_point, name: r.name }],

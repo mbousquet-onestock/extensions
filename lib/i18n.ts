@@ -215,6 +215,8 @@ const fr = {
   "ext.actionError.not_in_catalog": "Action impossible : l'extension n'est plus au catalogue.",
   "ext.actionError.not_found": "Action impossible : extension introuvable sur l'environnement.",
   "ext.actionError.duplicate_name": "Une extension du catalogue porte déjà ce nom.",
+  "form.rank": "Rang (rank)",
+  "form.rankHelp": "Ordre d'affichage dans OneStock (1 par défaut).",
 } as const;
 
 export type MessageKey = keyof typeof fr;
@@ -434,6 +436,8 @@ const en: Record<MessageKey, string> = {
   "ext.actionError.not_in_catalog": "Action not possible: the extension is no longer in the catalog.",
   "ext.actionError.not_found": "Action not possible: extension not found on the environment.",
   "ext.actionError.duplicate_name": "A catalog extension already has this name.",
+  "form.rank": "Rank",
+  "form.rankHelp": "Display order in OneStock (1 by default).",
 };
 
 const DICTIONARIES = { fr, en } as const;
