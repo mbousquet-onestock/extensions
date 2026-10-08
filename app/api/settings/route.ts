@@ -1,4 +1,5 @@
 import { HttpError, settingIdFrom, settingsRoute, valueFrom, wantsDecrypt } from "@/lib/settingsApi";
+import { invalidateFromRoute, SETTINGS_TAG } from "@/lib/cache";
 import { createSetting, listSettings, type SettingFilters } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
@@ -41,5 +42,6 @@ export const POST = settingsRoute(async (req, body) => {
     const scope = (item as { scope?: string | null }).scope;
     created.push(await createSetting({ ...id, value, ...(scope !== undefined && { scope }) }));
   }
+  invalidateFromRoute(SETTINGS_TAG);
   return { status: 201, body: Array.isArray(body) ? { settings: created } : { setting: created[0] } };
 });

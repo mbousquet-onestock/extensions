@@ -17,6 +17,7 @@ const PATHS = {
   chevronRight: <path d="m9.5 6 6 6-6 6" />,
   chevronDown: <path d="m6 9.5 6 6 6-6" />,
   store: <><path d="M4 9.5 5.5 4h13L20 9.5" /><path d="M4 9.5a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0" /><path d="M5.5 12v8h13v-8" /></>,
+  refresh: <><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" /><path d="M19.5 4.5v4h-4" /></>,
   bookmark: <><path d="M6 4h12v16l-6-4-6 4V4Z" /><path d="M12 7.5v5M9.5 10h5" /></>,
   unplug: <><path d="M5 12h3M16 12h3M8 8.5h8v7H8z" /><path d="M4 4l16 16" /></>,
   cube: <><path d="M12 3l7.5 4.3v9.4L12 21l-7.5-4.3V7.3L12 3z" /><path d="M12 12v9M4.5 7.3 12 12l7.5-4.7" /></>,

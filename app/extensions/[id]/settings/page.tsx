@@ -2,7 +2,7 @@ import Link from "next/link";
 import SettingsView from "@/components/SettingsView";
 import { Alert, Icon } from "@/components/ui";
 import { withContext } from "@/lib/context";
-import { ensureSchema, getSql } from "@/lib/db";
+import { getSql, withSchema } from "@/lib/db";
 import { getT } from "@/lib/i18n";
 import { getCredentials, getExtension, iconSrc, type OneStockExtension } from "@/lib/onestock";
 import { getSettings, type Setting } from "@/lib/settings";
@@ -27,8 +27,7 @@ export default async function ExtensionSettingsPage({
   let rows: Setting[] = [];
   let error: string | null = null;
   try {
-    await ensureSchema();
-    const [ext] = await getSql()`SELECT name, installation_point FROM extensions WHERE id = ${id}`;
+    const [ext] = await withSchema(() => getSql()`SELECT name, installation_point FROM extensions WHERE id = ${id}`);
     if (ext) {
       name = ext.name;
       anchors = [ext.installation_point];

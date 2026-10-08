@@ -1,6 +1,8 @@
 import http from "node:http";
 import https from "node:https";
-import { logApiCall } from "@/lib/apiLogs";
+import { logApiCallLater } from "@/lib/apiLogs";
+import { unstable_cache } from "next/cache";
+import { onestockTag, SETTINGS_TAG } from "@/lib/cache";
 import { getSql } from "@/lib/db";
 import { decryptSecret } from "@/lib/secrets";
 
@@ -13,17 +15,23 @@ export type Credentials = { apiRoot: string; token: string; environment: string 
  * l'emporte sur `*`). Environnement : ONESTOCK_ENVIRONMENT, sinon déduit du contexte (« qualif » dans
  * l'URL parente), sinon le seul disponible, sinon prod.
  */
+type CredentialRow = { key: string; value: string; site_id: string | null; environment: string };
+
+/** Lignes onestock_api_root / onestock_token du site, en cache 5 min (valeurs telles que stockées, token chiffré). */
+const credentialRows = (siteId: string) =>
+  unstable_cache(
+    async () =>
+      (await getSql()`
+        SELECT key, value, site_id, environment FROM settings
+        WHERE key IN ('onestock_api_root', 'onestock_token')
+          AND (site_id = ${siteId} OR site_id IS NULL OR site_id IN ('*', ''))
+          AND (extension_id IS NULL OR extension_id IN ('*', '') OR scope = 'global')`) as CredentialRow[],
+    ["onestock-credentials", siteId],
+    { tags: [SETTINGS_TAG], revalidate: 300 },
+  )();
+
 export async function getCredentials(siteId: string, hint?: string | null): Promise<Credentials | null> {
-  const rows = (await getSql()`
-    SELECT key, value, site_id, environment FROM settings
-    WHERE key IN ('onestock_api_root', 'onestock_token')
-      AND (site_id = ${siteId} OR site_id IS NULL OR site_id IN ('*', ''))
-      AND (extension_id IS NULL OR extension_id IN ('*', '') OR scope = 'global')`) as {
-    key: string;
-    value: string;
-    site_id: string | null;
-    environment: string;
-  }[];
+  const rows = await credentialRows(siteId);
   if (rows.length === 0) return null;
 
   const envs = [...new Set(rows.map((r) => r.environment))];
@@ -127,7 +135,7 @@ export async function callOneStock<T>(
     error = `OneStock API unreachable: ${(e as Error).message}`;
   }
 
-  await logApiCall({
+  logApiCallLater({
     siteId,
     api: "OneStock",
     method,
@@ -138,7 +146,7 @@ export async function callOneStock<T>(
     response: error ? null : stripImages(parsed),
     error,
     result: error ? null : summarize(parsed),
-  }).catch(() => {});
+  });
 
   if (error) throw new OneStockError(error, status);
   return parsed as T;
@@ -170,7 +178,35 @@ export type OneStockExtension = {
 };
 
 /** Extensions installées sur le site : `POST /extensions/query`, puis `GET /extensions/{id}` pour chacune. */
+/** Une réponse partielle (un détail en erreur) n'est pas mise en cache. */
+class Incomplete extends Error {
+  constructor(readonly value: OneStockExtension[]) {
+    super("incomplete");
+  }
+}
+
+/**
+ * Extensions installées, en cache 60 s par site et environnement ; invalidé dès qu'une extension
+ * est installée ou désinstallée depuis l'application, ou avec le bouton « Actualiser ».
+ */
 export async function getInstalledExtensions(creds: Credentials, siteId: string) {
+  try {
+    return await unstable_cache(
+      async () => {
+        const result = await fetchInstalledExtensions(creds, siteId);
+        if (result.some((e) => e.name === e.id)) throw new Incomplete(result);
+        return result;
+      },
+      ["onestock-installed", creds.apiRoot, creds.environment, siteId],
+      { tags: [onestockTag(siteId)], revalidate: 60 },
+    )();
+  } catch (e) {
+    if (e instanceof Incomplete) return e.value;
+    throw e;
+  }
+}
+
+async function fetchInstalledExtensions(creds: Credentials, siteId: string) {
   const list = await callOneStock<{ extensions?: { id: string }[] }>(creds, siteId, "POST", "/extensions/query");
   const ids = (list?.extensions ?? []).map((e) => e.id).filter(Boolean);
   const details = await Promise.all(
@@ -192,8 +228,19 @@ export async function getInstalledExtensions(creds: Credentials, siteId: string)
 }
 
 export async function getExtension(creds: Credentials, siteId: string, id: string) {
-  const res = await callOneStock<{ extension: OneStockExtension }>(creds, siteId, "GET", `/extensions/${encodeURIComponent(id)}`);
-  return res?.extension ?? null;
+  return unstable_cache(
+    async () => {
+      const res = await callOneStock<{ extension: OneStockExtension }>(
+        creds,
+        siteId,
+        "GET",
+        `/extensions/${encodeURIComponent(id)}`,
+      );
+      return res?.extension ?? null;
+    },
+    ["onestock-extension", creds.apiRoot, creds.environment, siteId, id],
+    { tags: [onestockTag(siteId)], revalidate: 60 },
+  )();
 }
 
 /** Image d'une icône renvoyée en base64 (JPEG par défaut, PNG/GIF/SVG reconnus). */

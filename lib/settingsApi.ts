@@ -1,5 +1,5 @@
 import { checkApiKey } from "@/lib/apiAuth";
-import { logApiCall } from "@/lib/apiLogs";
+import { logApiCallLater } from "@/lib/apiLogs";
 import { MissingKeyError, isSecretKey } from "@/lib/secrets";
 import type { SettingId } from "@/lib/settings";
 
@@ -62,7 +62,7 @@ export function settingsRoute(handler: (req: Request, body: unknown) => Promise<
       }
     }
 
-    await logApiCall({
+    logApiCallLater({
       siteId: url.searchParams.get("site_id") ?? (body as { site_id?: string })?.site_id ?? undefined,
       api: "Settings API",
       method: req.method,
@@ -73,7 +73,7 @@ export function settingsRoute(handler: (req: Request, body: unknown) => Promise<
       response: status >= 400 ? null : sanitize(payload),
       error: status >= 400 ? (payload as { error: string }).error : null,
       result: status < 400 ? summary(payload) : null,
-    }).catch(() => {});
+    });
 
     return status === 204 ? new Response(null, { status }) : json(status, payload);
   };

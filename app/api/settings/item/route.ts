@@ -1,4 +1,5 @@
 import { HttpError, settingIdFrom, settingsRoute, valueFrom, wantsDecrypt } from "@/lib/settingsApi";
+import { invalidateFromRoute, SETTINGS_TAG } from "@/lib/cache";
 import { createSetting, deleteSetting, readSetting, updateSetting } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
@@ -26,10 +27,14 @@ export const PUT = settingsRoute(async (req, body) => {
   if (value === undefined && b.scope === undefined) throw new HttpError(400, "nothing_to_update: value or scope expected");
 
   const updated = await updateSetting(id, { value, ...(b.scope !== undefined && { scope: b.scope }) });
-  if (updated) return { body: { setting: updated } };
+  if (updated) {
+    invalidateFromRoute(SETTINGS_TAG);
+    return { body: { setting: updated } };
+  }
 
   if (["1", "true"].includes(url.searchParams.get("upsert") ?? "")) {
     if (value === undefined) throw new HttpError(400, "missing_fields: value");
+    invalidateFromRoute(SETTINGS_TAG);
     return { status: 201, body: { setting: await createSetting({ ...id, value, ...(b.scope !== undefined && { scope: b.scope }) }) } };
   }
   throw new HttpError(404, "not_found");
@@ -39,5 +44,6 @@ export const PUT = settingsRoute(async (req, body) => {
 export const DELETE = settingsRoute(async (req) => {
   const deleted = await deleteSetting(settingIdFrom(new URL(req.url)));
   if (!deleted) throw new HttpError(404, "not_found");
+  invalidateFromRoute(SETTINGS_TAG);
   return { body: { deleted: true } };
 });

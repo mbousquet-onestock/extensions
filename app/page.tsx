@@ -10,7 +10,14 @@ import { nameKey, readCatalog, type Extension } from "@/lib/db";
 import { formatDate, getT, type MessageKey } from "@/lib/i18n";
 import { getCredentials, getInstalledExtensions, iconSrc, type OneStockExtension } from "@/lib/onestock";
 import { summarizeError } from "@/lib/payload";
-import { addToCatalog, deleteExtension, installOnEnvironment, saveExtension, uninstallFromEnvironment } from "./actions";
+import {
+  addToCatalog,
+  deleteExtension,
+  installOnEnvironment,
+  refreshFromOneStock,
+  saveExtension,
+  uninstallFromEnvironment,
+} from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -217,6 +224,16 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
               ))}
             </AutoSubmitSelect>
           </form>
+          {siteId && environment && (
+            <form action={refreshFromOneStock}>
+              <input type="hidden" name="site_id" value={siteId} />
+              <input type="hidden" name="back" value={here} />
+              <button type="submit" className="btn btn-secondary" title={t("ext.refreshHelp")}>
+                <Icon name="refresh" />
+                {t("ext.refresh")}
+              </button>
+            </form>
+          )}
           <Link href={withContext("/", params, { ...view, new: "1" })} className="btn btn-primary" scroll={false}>
             <Icon name="plus" />
             {t("ext.createBtn")}

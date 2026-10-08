@@ -23,6 +23,14 @@ Les settings peuvent être ajoutés et modifiés depuis ces deux pages (en modif
 
 Les colonnes de `api_logs` sont reconnues par leur nom : `created_at`, `api`, `method`, `path` (ou `url`), `status`, `duration_ms`, `result`, `error`, `request`, `response`, `site_id`.
 
+## Performances
+
+- Squelette de chargement affiché immédiatement sur chaque page (`loading.tsx`).
+- Réponses de l'API OneStock (extensions installées, détails) en cache 60 s par site, identifiants (`onestock_api_root` / `onestock_token`, valeurs chiffrées) 5 min. Le cache est vidé immédiatement après une installation, une désinstallation ou la modification d'un setting (interface ou API) ; le bouton « Actualiser » relit OneStock à la demande. Une réponse en erreur ou incomplète n'est jamais mise en cache.
+- Journalisation dans `api_logs` faite après l'envoi de la page (`after`), hors du temps de réponse.
+- Schéma du catalogue : aucune vérification sur les lectures ; la table est créée ou complétée seulement si elle manque (une requête de contrôle au plus par instance).
+- À vérifier côté Vercel : la région des fonctions doit être celle de la base Neon (sinon ~100 ms de plus par requête).
+
 ## Interface
 
 L'interface applique le design system OneStock (`@onestock-public/design-system`) : police Roboto, couleur primaire `#24bdb0`, cartes bordées sans ombre, onglets OsTabs, badges teintés, alertes OsAlert. Les tokens et composants CSS sont dans `app/globals.css`, les primitives (icônes, alertes, modale) dans `components/ui.tsx`. Les formulaires de création / modification s'ouvrent dans une modale (fermeture par Échap ou clic à l'extérieur).

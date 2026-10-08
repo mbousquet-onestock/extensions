@@ -308,3 +308,14 @@ pre.code { margin: 6px 0 0; padding: 8px; background: var(--neutral-30); border-
 .point-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-m); }
 .section-title { font-size: 14px; font-weight: 500; margin: 0; }
 .secret-value { display: inline-flex; align-items: center; gap: 8px; }
+
+/* ---------- Squelette de chargement ---------- */
+.sk { background: var(--neutral-50); border-radius: var(--radius-m); animation: sk-pulse 1.4s ease-in-out infinite; }
+.sk-title { width: 180px; height: 26px; margin-bottom: 8px; }
+.sk-line { height: 14px; }
+.sk-input { flex: 1; height: 36px; }
+.sk-button { width: 96px; height: 36px; }
+.sk-row { display: flex; gap: 24px; padding: 14px 16px; border-top: 1px solid var(--border-primary); }
+.sk-cell { height: 14px; }
+@keyframes sk-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+@media (prefers-reduced-motion: reduce) { .sk { animation: none; } }

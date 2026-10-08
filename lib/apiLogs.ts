@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { getSql, isWritableColumn, tableColumns } from "@/lib/db";
 import { summarizeError } from "@/lib/payload";
 
@@ -258,4 +259,17 @@ export async function logApiCall(call: ApiCall) {
     `INSERT INTO ${LOGS_TABLE} (${cols.join(", ")}) VALUES (${cols.map((_, i) => `$${i + 1}`).join(", ")})`,
     args,
   );
+}
+
+/**
+ * Journalise un appel sans retarder la réponse : l'écriture est faite après l'envoi de la page
+ * (`after` de Next.js). Hors requête (script), elle est lancée immédiatement en arrière-plan.
+ */
+export function logApiCallLater(call: ApiCall) {
+  const run = () => logApiCall(call).catch(() => {});
+  try {
+    after(run);
+  } catch {
+    void run();
+  }
 }

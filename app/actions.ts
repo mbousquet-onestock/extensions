@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { invalidateNow, onestockTag, SETTINGS_TAG } from "@/lib/cache";
 import { redirect } from "next/navigation";
 import { clearLogs } from "@/lib/apiLogs";
 import {
@@ -122,6 +123,7 @@ export async function installOnEnvironment(form: FormData) {
       error = `${(e as Error).message}`;
     }
   }
+  invalidateNow(onestockTag(ctx!.siteId), SETTINGS_TAG);
   revalidatePath("/");
   revalidatePath("/extensions/[id]/settings", "page");
   redirect(
@@ -142,6 +144,7 @@ export async function uninstallFromEnvironment(form: FormData) {
   } catch (e) {
     error = apiError(e);
   }
+  invalidateNow(onestockTag(ctx!.siteId));
   revalidatePath("/");
   redirect(backWith(back, error ? { action_error: error } : { done: "uninstalled", name }));
 }
@@ -257,7 +260,16 @@ export async function saveSetting(form: FormData) {
     const code = (e as { code?: string }).code;
     redirect(reopen(code === "23505" ? "duplicate" : (e as Error).message));
   }
+  invalidateNow(SETTINGS_TAG);
   revalidatePath("/settings");
   revalidatePath("/extensions/[id]/settings", "page");
   redirect(backWith(back, { saved: "1" }));
+}
+
+/** Relit immédiatement les extensions installées depuis l'API OneStock (vide le cache du site). */
+export async function refreshFromOneStock(form: FormData) {
+  const siteId = text(form, "site_id");
+  if (siteId) invalidateNow(onestockTag(siteId));
+  revalidatePath("/");
+  redirect(backWith(text(form, "back"), {}));
 }

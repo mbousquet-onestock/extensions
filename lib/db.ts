@@ -13,10 +13,19 @@ export function getSql() {
 
 let schema: Promise<unknown> | null = null;
 
-// Crée la table extensions (catalogue) au premier accès si elles n'existent pas encore.
+const CATALOG_COLUMNS = ["id", "name", "description", "icon", "url", "test_url", "rank", "injection_points"];
+
+/**
+ * Crée ou complète la table extensions (catalogue). Une seule requête de vérification quand le schéma
+ * est déjà à jour (cas normal) ; les CREATE / ALTER ne sont joués que s'il manque quelque chose.
+ */
 export function ensureSchema() {
   schema ??= (async () => {
     const sql = getSql();
+    const [check] = await sql`
+      SELECT count(*)::int AS n FROM information_schema.columns
+      WHERE table_name = 'extensions' AND table_schema = current_schema() AND column_name = ANY(${CATALOG_COLUMNS})`;
+    if (check.n === CATALOG_COLUMNS.length) return;
     await sql`
       CREATE TABLE IF NOT EXISTS extensions (
         id                 TEXT PRIMARY KEY,
@@ -59,11 +68,26 @@ export type Extension = {
 /** Lien entre catalogue et extensions installées : le nom (l'id OneStock change selon l'environnement). */
 export const nameKey = (name: string | null | undefined) => (name ?? "").trim().toLowerCase();
 
+/** Table ou colonne absente (42P01 / 42703) : le schéma n'a pas encore été créé ou complété. */
+const isSchemaError = (e: unknown) => ["42P01", "42703"].includes((e as { code?: string }).code ?? "");
+
+/** Exécute une lecture sans vérification préalable du schéma ; le crée puis réessaie seulement s'il manque. */
+export async function withSchema<T>(read: () => Promise<T>): Promise<T> {
+  try {
+    return await read();
+  } catch (e) {
+    if (!isSchemaError(e)) throw e;
+    await ensureSchema();
+    return read();
+  }
+}
+
 export async function readCatalog(): Promise<Extension[]> {
-  await ensureSchema();
-  const rows = await getSql()`
-    SELECT id, name, description, icon, url, test_url, rank, injection_points, installation_point, updated_at
-    FROM extensions ORDER BY name`;
+  const rows = await withSchema(
+    () => getSql()`
+      SELECT id, name, description, icon, url, test_url, rank, injection_points, installation_point, updated_at
+      FROM extensions ORDER BY name`,
+  );
   return rows.map((r) => {
     const points = Array.isArray(r.injection_points) ? (r.injection_points as CatalogInjectionPoint[]) : [];
     return {

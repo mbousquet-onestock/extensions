@@ -220,6 +220,9 @@ const fr = {
   "ext.copiedSettings": "{n} variable(s) globale(s) copiée(s) sur le site {site}.",
   "set.forSiteOnly": "variables du site {site}",
   "set.globalOnly": "variables globales (modèle copié sur chaque site à l'installation)",
+  "ext.refresh": "Actualiser",
+  "ext.refreshHelp": "Relire les extensions installées depuis l'API OneStock (sinon mises en cache 60 s)",
+  "common.loading": "Chargement…",
 } as const;
 
 export type MessageKey = keyof typeof fr;
@@ -444,6 +447,9 @@ const en: Record<MessageKey, string> = {
   "ext.copiedSettings": "{n} global variable(s) copied to site {site}.",
   "set.forSiteOnly": "site {site} variables",
   "set.globalOnly": "global variables (template copied to each site on installation)",
+  "ext.refresh": "Refresh",
+  "ext.refreshHelp": "Reload installed extensions from the OneStock API (otherwise cached for 60 s)",
+  "common.loading": "Loading…",
 };
 
 const DICTIONARIES = { fr, en } as const;
