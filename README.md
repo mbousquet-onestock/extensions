@@ -12,7 +12,7 @@ App Next.js (déployée sur Vercel) chargée en iframe dans OneStock comme UI ex
   - **Supprimer du catalogue** : n'affecte pas les installations.
 
   Ces deux endpoints ne sont pas dans la documentation OneStock : ils suivent les conventions de `/extensions/query` et `/extensions/{id}` et sont regroupés dans `createExtension` / `deleteRemoteExtension` (`lib/onestock.ts`) pour être ajustés si besoin.
-- **Settings d'une extension** (`/extensions/<id>/settings`) : lignes de la table `settings` dont `extension_id` est l'id OneStock de l'extension ou le slug d'un de ses points d'injection.
+- **Settings d'une extension** (`/extensions/<id>/settings`) : lignes de la table `settings` du site du contexte dont `extension_id` est l'id OneStock de l'extension, son nom ou le slug d'un de ses points d'injection. Les variables globales de l'extension (`site_id` vide) n'y sont pas affichées : elles servent de modèle et sont copiées sur le site lors de l'installation de l'extension sur l'environnement (même environnement, valeurs déjà présentes sur le site conservées).
 - **Settings généraux** (`/settings`) : lignes de `settings` avec `scope = 'global'` (ou `extension_id = '*'`).
 
 Les settings peuvent être ajoutés et modifiés depuis ces deux pages (en modification, seuls la valeur et le scope changent : `key`, `site_id`, `extension_id` et `environment` forment la clé). Ils sont filtrés sur le `site_id` du contexte ; un `site_id` à `*` ou vide vaut pour tous les sites et est marqué « remplacé » quand une valeur existe pour le site. Filtre par `environment`.
@@ -42,6 +42,7 @@ Table existante utilisée : `settings` (`key`, `value`, `updated_at`, `site_id`,
 | `DATABASE_URL` / `POSTGRES_URL` | Connexion à la base Postgres Vercel (Neon). |
 | `EXTENSION_SECRETS` | Clé(s) secrète(s) OneStock pour vérifier la signature, séparées par des virgules. Sans elle, la signature n'est pas vérifiée. |
 | `SETTINGS_ENCRYPTION_KEY` | **Obligatoire** pour enregistrer une valeur sensible : clé de chiffrement AES-256 (`openssl rand -hex 32`). À conserver précieusement : sans elle, les valeurs chiffrées sont illisibles. |
+| `SETTINGS_API_KEYS` | Clé(s) d'accès à l'API `/api/settings`, séparées par des virgules (`openssl rand -hex 32`). Sans clé, l'API est désactivée (503). |
 | `ONESTOCK_ENVIRONMENT` | Optionnel : environnement des settings `onestock_api_root` / `onestock_token` à utiliser (sinon « qualif » si l'URL parente le contient, ou le seul environnement disponible, ou prod). |
 | `ONESTOCK_API_VERSION` | Optionnel : version ajoutée à `onestock_api_root` (ex. `v3`). Par défaut l'URL est utilisée telle quelle. |
 | `ADMIN_PASSWORD` | Optionnel : authentification basique sur toutes les pages (peu adaptée à l'affichage en iframe). |
@@ -61,3 +62,41 @@ Les valeurs sensibles sont stockées chiffrées (`enc:v1:…`). Une autre applic
 1. Partager `SETTINGS_ENCRYPTION_KEY` avec ses projets Vercel (variable d'environnement partagée de l'équipe, reliée à chaque projet).
 2. Copier `shared/settings-secrets.mjs` (autonome, sans dépendance) et appeler `decryptSetting(row.value)` sur la valeur lue. Une valeur encore en clair est renvoyée telle quelle : le module peut être déployé avant la migration.
 3. Une fois toutes les applications à jour, lancer `npm run secrets:encrypt`.
+
+## API settings
+
+API REST pour lire et modifier la table `settings` depuis d'autres applications. Authentification par clé : `Authorization: Bearer <clé>` (ou en-tête `x-api-key`), clés définies dans `SETTINGS_API_KEYS`. Chaque appel est journalisé dans `api_logs` (API « Settings API », valeurs sensibles masquées).
+
+Un setting est identifié par `key` + `site_id` (vide = global) + `extension_id` + `environment`. Les clés sensibles (`onestock_token`…) sont chiffrées automatiquement à l'écriture ; à la lecture leur `value` vaut `null` sauf avec `?decrypt=1`.
+
+| Méthode | URL | Rôle |
+| --- | --- | --- |
+| `GET` | `/api/settings?key=&site_id=&extension_id=&environment=&scope=&limit=&decrypt=1` | Liste (filtres facultatifs ; `site_id=` vide → globaux) |
+| `POST` | `/api/settings` | Crée un setting (objet) ou plusieurs (tableau, 500 max) — 409 s'il existe |
+| `GET` | `/api/settings/item?key=…&site_id=…&extension_id=…&environment=…` | Lit un setting — 404 s'il n'existe pas |
+| `PUT` | `/api/settings/item?key=…&site_id=…&extension_id=…&environment=…` | Met à jour `{ value?, scope? }` — 404 s'il n'existe pas, sauf `&upsert=1` (création) |
+| `DELETE` | `/api/settings/item?key=…&site_id=…&extension_id=…&environment=…` | Supprime un setting |
+
+```bash
+API=https://<app>.vercel.app/api/settings
+AUTH="Authorization: Bearer $SETTINGS_API_KEY"
+
+# Lire les settings globaux d'un site
+curl -H "$AUTH" "$API?site_id=o0057&extension_id=*&environment=qualif"
+
+# Créer
+curl -H "$AUTH" -H 'content-type: application/json' -X POST "$API" \
+  -d '{"key":"default_lang","value":"fr","site_id":"o0057","extension_id":"*","environment":"qualif"}'
+
+# Lire onestock_token déchiffré
+curl -H "$AUTH" "$API/item?key=onestock_token&site_id=&extension_id=*&environment=qualif&decrypt=1"
+
+# Mettre à jour (ou créer avec upsert=1)
+curl -H "$AUTH" -H 'content-type: application/json' -X PUT \
+  "$API/item?key=default_lang&site_id=o0057&extension_id=*&environment=qualif" -d '{"value":"en"}'
+
+# Supprimer
+curl -H "$AUTH" -X DELETE "$API/item?key=default_lang&site_id=o0057&extension_id=*&environment=qualif"
+```
+
+Réponses : `{ "settings": [...], "count": n }` (liste), `{ "setting": {...} }` (un setting), `{ "deleted": true }` ; erreurs `{ "error": "…" }` avec 400 (champ manquant, JSON invalide), 401 (clé absente ou invalide), 404, 409 (déjà existant), 500 (`encryption_key_missing` si `SETTINGS_ENCRYPTION_KEY` manque pour une clé sensible), 503 (API désactivée). Un setting renvoyé contient `key`, `site_id`, `extension_id`, `environment`, `scope`, `value`, `updated_at`, `secret`, `encrypted` (et `decrypt_error` si le déchiffrement a échoué).

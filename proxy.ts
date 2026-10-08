@@ -17,4 +17,5 @@ export function proxy(req: NextRequest) {
   });
 }
 
-export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"] };
+// L'API settings a sa propre authentification (clé d'API) : exclue de l'authentification basique.
+export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico|api/settings).*)"] };
