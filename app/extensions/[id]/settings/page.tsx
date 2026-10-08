@@ -43,8 +43,9 @@ export default async function ExtensionSettingsPage({
       anchors = [...new Set((os.injection_points ?? []).map((p) => p.anchor))];
     }
     // Les settings peuvent être rangés sous l'id OneStock ou sous le slug d'un point d'injection.
-    const aliases = [id, ...(os?.injection_points ?? []).map((p) => p.slug ?? "")].filter(Boolean);
-    rows = await getSettings({ extensionId: aliases, siteId });
+    const aliases = [id, name, ...(os?.injection_points ?? []).map((p) => p.slug ?? "")].filter(Boolean);
+    // Uniquement les variables du site : les variables globales (site_id vide) servent de modèle à l'installation.
+    rows = await getSettings({ extensionId: aliases, siteId, siteOnly: true });
   } catch (e) {
     error = (e as Error).message;
   }
@@ -71,7 +72,7 @@ export default async function ExtensionSettingsPage({
                 <span className="tag">{id}</span>
                 {anchors.map((a) => <span key={a} className="tag">{a}</span>)}
                 <span>
-                  {siteId ? t("set.forSite", { site: siteId }) : ""} · {t("set.count", { n: rows.length })}
+                  {siteId ? t("set.forSiteOnly", { site: siteId }) : t("set.globalOnly")} · {t("set.count", { n: rows.length })}
                 </span>
               </p>
             </div>

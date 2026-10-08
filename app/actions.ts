@@ -11,6 +11,7 @@ import {
   type OneStockExtension,
 } from "@/lib/onestock";
 import { summarizeError } from "@/lib/payload";
+import { copyGlobalSettingsToSite } from "@/lib/settings";
 import { randomUUID } from "node:crypto";
 import { encryptSecret, isSecretKey, MissingKeyError } from "@/lib/secrets";
 import { ensureSchema, getSql, isWritableColumn, nameKey, readCatalog, type CatalogInjectionPoint } from "@/lib/db";
@@ -105,13 +106,27 @@ export async function installOnEnvironment(form: FormData) {
   if (!ext) redirect(backWith(back, { action_error: "not_in_catalog" }));
 
   let error: string | null = null;
+  let copied = 0;
   try {
     await createExtension(ctx!.creds, ctx!.siteId, ext!);
   } catch (e) {
     error = apiError(e);
   }
+  if (!error) {
+    // Variables globales de l'extension (site_id vide) dupliquées sur le site de l'environnement.
+    // L'id OneStock n'existant qu'après création, elles sont repérées par slug, nom ou id catalogue.
+    const ids = [...(ext!.injection_points ?? []).map((p) => p.slug ?? ""), ext!.name, ext!.id];
+    try {
+      copied = await copyGlobalSettingsToSite(ids, ctx!.siteId, ctx!.creds.environment);
+    } catch (e) {
+      error = `${(e as Error).message}`;
+    }
+  }
   revalidatePath("/");
-  redirect(backWith(back, error ? { action_error: error } : { done: "installed", name }));
+  revalidatePath("/extensions/[id]/settings", "page");
+  redirect(
+    backWith(back, error ? { action_error: error } : { done: "installed", name, copied: String(copied) }),
+  );
 }
 
 /** Supprime une extension de l'environnement (API OneStock). */
@@ -174,7 +189,7 @@ export async function clearLogsAction(form: FormData) {
 
 function backWith(back: string, extra: Record<string, string>) {
   const url = new URL(back.startsWith("/") ? back : "/", "http://x");
-  for (const k of ["edit", "new", "edit_key", "edit_site", "edit_ext", "edit_env", "saved", "error", "purged", "cleared", "done", "name", "action_error"]) url.searchParams.delete(k);
+  for (const k of ["edit", "new", "edit_key", "edit_site", "edit_ext", "edit_env", "saved", "error", "purged", "cleared", "done", "name", "action_error", "copied"]) url.searchParams.delete(k);
   for (const [k, v] of Object.entries(extra)) url.searchParams.set(k, v);
   return `${url.pathname}${url.search}`;
 }

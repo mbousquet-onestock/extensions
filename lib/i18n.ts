@@ -217,6 +217,9 @@ const fr = {
   "ext.actionError.duplicate_name": "Une extension du catalogue porte déjà ce nom.",
   "form.rank": "Rang (rank)",
   "form.rankHelp": "Ordre d'affichage dans OneStock (1 par défaut).",
+  "ext.copiedSettings": "{n} variable(s) globale(s) copiée(s) sur le site {site}.",
+  "set.forSiteOnly": "variables du site {site}",
+  "set.globalOnly": "variables globales (modèle copié sur chaque site à l'installation)",
 } as const;
 
 export type MessageKey = keyof typeof fr;
@@ -438,6 +441,9 @@ const en: Record<MessageKey, string> = {
   "ext.actionError.duplicate_name": "A catalog extension already has this name.",
   "form.rank": "Rank",
   "form.rankHelp": "Display order in OneStock (1 by default).",
+  "ext.copiedSettings": "{n} global variable(s) copied to site {site}.",
+  "set.forSiteOnly": "site {site} variables",
+  "set.globalOnly": "global variables (template copied to each site on installation)",
 };
 
 const DICTIONARIES = { fr, en } as const;

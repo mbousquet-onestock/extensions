@@ -187,7 +187,12 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
       {!siteId && <Alert type="info">{t("ext.noSite")}</Alert>}
       {apiProblem && <Alert type="danger">{apiProblem}</Alert>}
       {params.done && DONE_KEYS.includes(params.done as never) && (
-        <Alert type="success">{t(`ext.done.${params.done}` as MessageKey, { name: params.name ?? "" })}</Alert>
+        <Alert type="success">
+          {t(`ext.done.${params.done}` as MessageKey, { name: params.name ?? "" })}
+          {params.done === "installed" && params.copied !== undefined && (
+            <> {t("ext.copiedSettings", { n: params.copied, site: siteId })}</>
+          )}
+        </Alert>
       )}
       {params.action_error && (
         <Alert type="danger">
