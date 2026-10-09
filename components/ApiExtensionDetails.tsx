@@ -59,8 +59,6 @@ export default function ApiExtensionDetails({
         <dd>{link(ext.url)}</dd>
         <dt>test_url</dt>
         <dd>{link(ext.test_url)}</dd>
-        <dt>rank</dt>
-        <dd>{ext.rank ?? "—"}</dd>
         <dt>creation_date</dt>
         <dd>{date(ext.creation_date)}</dd>
         <dt>last_update</dt>

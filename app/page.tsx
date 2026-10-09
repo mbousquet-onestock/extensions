@@ -23,9 +23,9 @@ export const dynamic = "force-dynamic";
 
 type Search = Record<string, string | undefined>;
 const STATUSES = ["all", "installed", "not_installed"] as const;
-const DEFAULT_POINTS = ["bo.page", "bo.order.action", "bo.orders.action"];
+const DEFAULT_POINTS = ["bo.page", "bo.order.action", "bo.orders.action", "bo.customer.information", "bo.customer.tab"];
 const DONE_KEYS = ["installed", "uninstalled", "cataloged", "deleted"] as const;
-const ACTION_ERRORS = ["no_credentials", "not_in_catalog", "not_found", "duplicate_name"] as const;
+const ACTION_ERRORS = ["no_credentials", "not_in_catalog", "not_found", "duplicate_name", "missing_required"] as const;
 
 type Row = {
   key: string;
@@ -46,7 +46,6 @@ function differences(c: Extension, os: OneStockExtension) {
   const diff: string[] = [];
   if ((c.url ?? "") !== (os.url ?? "")) diff.push("url");
   if ((c.test_url ?? "") !== (os.test_url ?? "")) diff.push("test_url");
-  if (c.rank != null && os.rank != null && c.rank !== os.rank) diff.push("rank");
   if ((c.icon ?? "") !== (os.icon ?? "")) diff.push("icon");
   if (pointsSig(c.injection_points) !== pointsSig(os.injection_points)) diff.push("injection_points");
   return diff;
@@ -155,20 +154,20 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
     icon: source?.icon ?? "",
     url: source?.url ?? "",
     test_url: source?.test_url ?? "",
-    rank: source?.rank != null ? String(source.rank) : "",
     injection_points: (source?.injection_points ?? []).map((p) => ({
       anchor: p.anchor,
       name: p.name ?? "",
       slug: p.slug ?? "",
       path: p.path ?? "",
       icon: p.icon ?? "",
+      ...(p.rank != null && { rank: p.rank }),
     })),
   };
   const formError =
     params.error === "duplicate_name" || params.error === "required" ? t(`ext.${params.error}` as MessageKey) : params.error;
   const formLabels = {
     name: t("form.name"), nameHelp: t("form.nameHelp"), description: t("form.description"), icon: t("form.icon"),
-    url: t("form.url"), testUrl: t("form.testUrl"), rank: t("form.rank"), rankHelp: t("form.rankHelp"), points: t("form.points"), anchor: t("form.anchor"),
+    url: t("form.url"), testUrl: t("form.testUrl"), pointRank: t("form.rank"), pointRankHelp: t("form.rankHelp"), points: t("form.points"), anchor: t("form.anchor"),
     pointName: t("form.pointName"), slug: t("form.slug"), path: t("form.path"), addPoint: t("form.addPoint"),
     removePoint: t("form.removePoint"), chooseIcon: t("form.chooseIcon"), removeIcon: t("form.removeIcon"),
     iconHelp: t("form.iconHelp"), iconTooBig: t("form.iconTooBig"), noPoints: t("form.noPoints"),
@@ -204,7 +203,7 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
       {params.action_error && (
         <Alert type="danger">
           {ACTION_ERRORS.includes(params.action_error as never)
-            ? t(`ext.actionError.${params.action_error}` as MessageKey, { site: siteId })
+            ? t(`ext.actionError.${params.action_error}` as MessageKey, { site: siteId, fields: params.fields ?? "" })
             : t("ext.apiError", { error: params.action_error })}
         </Alert>
       )}

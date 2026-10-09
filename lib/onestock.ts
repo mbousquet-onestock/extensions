@@ -163,7 +163,7 @@ function summarize(v: unknown) {
 
 // ---------- Extensions ----------
 
-export type InjectionPoint = { anchor: string; name?: string; path?: string; slug?: string; icon?: string };
+export type InjectionPoint = { anchor: string; name?: string; path?: string; slug?: string; icon?: string; rank?: number };
 
 export type OneStockExtension = {
   id: string;
@@ -257,9 +257,11 @@ export function iconSrc(icon?: string) {
 
 export type ExtensionPayload = {
   name: string;
+  description?: string | null;
   icon?: string | null;
   url?: string | null;
   test_url?: string | null;
+  /** Rang par défaut des points d'injection qui n'en ont pas. */
   rank?: number | null;
   injection_points?: InjectionPoint[];
 };
@@ -269,18 +271,47 @@ function compact<T extends Record<string, unknown>>(o: T) {
   return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== null && v !== undefined && v !== "")) as Partial<T>;
 }
 
-/** Crée l'extension sur l'environnement : `POST {url}/extensions` avec `{ site_id, token, extension }`. */
-export async function createExtension(creds: Credentials, siteId: string, ext: ExtensionPayload) {
-  // Format attendu par OneStock : { rank, icon, name, url, injection_points: [{ name, path, icon, anchor }] }
-  const extension = compact({
-    rank: ext.rank ?? 1,
+/** Champs obligatoires selon la spec OneStock (POST_v1_extensions_extension et ses injection_points). */
+export function missingForInstall(ext: ExtensionPayload) {
+  const missing: string[] = [];
+  if (!ext.name) missing.push("name");
+  if (!ext.url) missing.push("url");
+  if (!ext.icon) missing.push("icon");
+  const points = (ext.injection_points ?? []).filter((p) => p.anchor);
+  if (points.length === 0) missing.push("injection_points");
+  return missing;
+}
+
+/**
+ * Corps de `POST {url}/extensions` conforme à la spec OneStock :
+ * extension = { name, description, icon, url, test_url, injection_points: [{ name, anchor, path, icon, slug, rank }] }.
+ * Le rang est porté par chaque point d'injection (l'objet extension n'accepte pas de champ `rank`).
+ */
+export function extensionBody(ext: ExtensionPayload) {
+  return compact({
     name: ext.name,
+    description: ext.description,
     icon: ext.icon,
     url: ext.url,
     test_url: ext.test_url,
-    injection_points: (ext.injection_points ?? []).map((p) => compact({ ...p })),
+    injection_points: (ext.injection_points ?? [])
+      .filter((p) => p.anchor)
+      .map((p) =>
+        compact({
+          name: p.name || ext.name, // obligatoire
+          anchor: p.anchor,
+          path: p.path || "/", // obligatoire
+          icon: p.icon,
+          slug: p.slug,
+          rank: p.rank ?? ext.rank ?? 1,
+        }),
+      ),
   });
-  return callOneStock<{ id?: string; extension?: { id?: string } }>(creds, siteId, "POST", "/extensions", { extension });
+}
+
+/** Crée l'extension sur l'environnement : `POST {url}/extensions` avec `{ site_id, token, extension }`. */
+export async function createExtension(creds: Credentials, siteId: string, ext: ExtensionPayload) {
+  return callOneStock<unknown>(creds, siteId, "POST", "/extensions", { extension: extensionBody(ext) });
 }
 
 /** Supprime l'extension de l'environnement : `DELETE {url}/extensions/{id}` avec `{ site_id, token }`. */

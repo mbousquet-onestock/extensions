@@ -216,13 +216,14 @@ const fr = {
   "ext.actionError.not_found": "Action impossible : extension introuvable sur l'environnement.",
   "ext.actionError.duplicate_name": "Une extension du catalogue porte déjà ce nom.",
   "form.rank": "Rang (rank)",
-  "form.rankHelp": "Ordre d'affichage dans OneStock (1 par défaut).",
+  "form.rankHelp": "Si plusieurs extensions sont sur la même ancre, le rang le plus élevé apparaît en premier (1 par défaut).",
   "ext.copiedSettings": "{n} variable(s) globale(s) copiée(s) sur le site {site}.",
   "set.forSiteOnly": "variables du site {site}",
   "set.globalOnly": "variables globales (modèle copié sur chaque site à l'installation)",
   "ext.refresh": "Actualiser",
   "ext.refreshHelp": "Relire les extensions installées depuis l'API OneStock (sinon mises en cache 60 s)",
   "common.loading": "Chargement…",
+  "ext.actionError.missing_required": "Installation impossible : champ(s) obligatoire(s) manquant(s) au catalogue pour OneStock : {fields}.",
 } as const;
 
 export type MessageKey = keyof typeof fr;
@@ -443,13 +444,14 @@ const en: Record<MessageKey, string> = {
   "ext.actionError.not_found": "Action not possible: extension not found on the environment.",
   "ext.actionError.duplicate_name": "A catalog extension already has this name.",
   "form.rank": "Rank",
-  "form.rankHelp": "Display order in OneStock (1 by default).",
+  "form.rankHelp": "When several extensions share an anchor, the highest rank appears first (1 by default).",
   "ext.copiedSettings": "{n} global variable(s) copied to site {site}.",
   "set.forSiteOnly": "site {site} variables",
   "set.globalOnly": "global variables (template copied to each site on installation)",
   "ext.refresh": "Refresh",
   "ext.refreshHelp": "Reload installed extensions from the OneStock API (otherwise cached for 60 s)",
   "common.loading": "Loading…",
+  "ext.actionError.missing_required": "Cannot install: required field(s) missing in the catalog for OneStock: {fields}.",
 };
 
 const DICTIONARIES = { fr, en } as const;

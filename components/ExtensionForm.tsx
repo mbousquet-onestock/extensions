@@ -14,12 +14,11 @@ export type ExtensionFormValues = {
   icon: string;
   url: string;
   test_url: string;
-  rank: string;
   injection_points: CatalogInjectionPoint[];
 };
 
 export type ExtensionFormLabels = Record<
-  | "name" | "description" | "icon" | "url" | "testUrl" | "rank" | "rankHelp" | "points" | "anchor" | "pointName" | "slug" | "path"
+  | "name" | "description" | "icon" | "url" | "testUrl" | "pointRank" | "pointRankHelp" | "points" | "anchor" | "pointName" | "slug" | "path"
   | "addPoint" | "removePoint" | "chooseIcon" | "removeIcon" | "iconHelp" | "iconTooBig" | "nameHelp"
   | "cancel" | "save" | "create" | "noPoints",
   string
@@ -137,11 +136,6 @@ export default function ExtensionForm({
             <span className="field-label">{labels.testUrl}</span>
             <input className="input mono" name="test_url" type="url" placeholder="https://" defaultValue={initial.test_url} />
           </label>
-          <label className="field">
-            <span className="field-label">{labels.rank}</span>
-            <input className="input" name="rank" type="number" min={0} step={1} defaultValue={initial.rank} placeholder="1" />
-            <span className="field-help">{labels.rankHelp}</span>
-          </label>
           <label className="field full">
             <span className="field-label">{labels.description}</span>
             <textarea className="textarea" style={{ fontFamily: "inherit", minHeight: 60 }} name="description" rows={2} defaultValue={initial.description} />
@@ -187,6 +181,17 @@ export default function ExtensionForm({
                 <label className="field">
                   <span className="field-label">{labels.path}</span>
                   <input className="input mono" value={p.path ?? ""} placeholder="/" onChange={(e) => update(i, { path: e.target.value })} />
+                </label>
+                <label className="field" title={labels.pointRankHelp}>
+                  <span className="field-label">{labels.pointRank}</span>
+                  <input
+                    className="input"
+                    type="number"
+                    step={1}
+                    placeholder="1"
+                    value={p.rank ?? ""}
+                    onChange={(e) => update(i, { rank: e.target.value === "" ? undefined : Number(e.target.value) })}
+                  />
                 </label>
               </div>
               <div className="point-foot">

@@ -49,7 +49,8 @@ export function ensureSchema() {
   return schema;
 }
 
-export type CatalogInjectionPoint = { anchor: string; name?: string; slug?: string; path?: string; icon?: string };
+/** Point d'injection (spec OneStock : name, anchor et path obligatoires ; rank = ordre sur l'ancre). */
+export type CatalogInjectionPoint = { anchor: string; name?: string; slug?: string; path?: string; icon?: string; rank?: number };
 
 /** Extension du catalogue (commun à tous les sites et environnements). */
 export type Extension = {
@@ -59,7 +60,7 @@ export type Extension = {
   icon: string | null;
   url: string | null;
   test_url: string | null;
-  /** Ordre d'affichage dans OneStock (`rank`). */
+  /** Ancien rang au niveau de l'extension : sert de valeur par défaut aux points d'injection qui n'en ont pas. */
   rank: number | null;
   injection_points: CatalogInjectionPoint[];
   updated_at?: Date;
@@ -100,7 +101,12 @@ export async function readCatalog(): Promise<Extension[]> {
       rank: r.rank ?? null,
       updated_at: r.updated_at,
       // Anciennes lignes : un seul point d'installation.
-      injection_points: points.length || !r.installation_point ? points : [{ anchor: r.installation_point, name: r.name }],
+      injection_points: (
+        (points.length || !r.installation_point ? points : [{ anchor: r.installation_point, name: r.name }]) as CatalogInjectionPoint[]
+      ).map(
+        // Le rang se porte désormais sur chaque point d'injection (spec OneStock).
+        (p) => (p.rank == null && r.rank != null ? { ...p, rank: r.rank } : p),
+      ),
     };
   });
 }

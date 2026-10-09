@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { clearLogs } from "@/lib/apiLogs";
 import {
   createExtension,
+  missingForInstall,
   deleteRemoteExtension,
   getCredentials,
   getExtension,
@@ -39,6 +40,7 @@ export async function saveExtension(form: FormData) {
         slug: String(p.slug ?? "").trim() || undefined,
         path: String(p.path ?? "").trim() || undefined,
         icon: String(p.icon ?? "").trim() || undefined,
+        rank: Number.isInteger(Number(p.rank)) && String(p.rank ?? "").trim() !== "" ? Number(p.rank) : undefined,
       }))
       .filter((p) => p.anchor);
   } catch {}
@@ -49,7 +51,7 @@ export async function saveExtension(form: FormData) {
     icon: text(form, "icon") || null,
     url: text(form, "url") || null,
     test_url: text(form, "test_url") || null,
-    rank: Number.isInteger(Number(text(form, "rank"))) && text(form, "rank") !== "" ? Number(text(form, "rank")) : null,
+    rank: null, // le rang est désormais porté par chaque point d'injection
     points: JSON.stringify(points),
   };
 
@@ -105,6 +107,8 @@ export async function installOnEnvironment(form: FormData) {
 
   const [ext] = (await readCatalog()).filter((c) => c.id === text(form, "id"));
   if (!ext) redirect(backWith(back, { action_error: "not_in_catalog" }));
+  const missing = missingForInstall(ext!);
+  if (missing.length) redirect(backWith(back, { action_error: "missing_required", fields: missing.join(", ") }));
 
   let error: string | null = null;
   let copied = 0;
@@ -192,7 +196,7 @@ export async function clearLogsAction(form: FormData) {
 
 function backWith(back: string, extra: Record<string, string>) {
   const url = new URL(back.startsWith("/") ? back : "/", "http://x");
-  for (const k of ["edit", "new", "edit_key", "edit_site", "edit_ext", "edit_env", "saved", "error", "purged", "cleared", "done", "name", "action_error", "copied"]) url.searchParams.delete(k);
+  for (const k of ["edit", "new", "edit_key", "edit_site", "edit_ext", "edit_env", "saved", "error", "purged", "cleared", "done", "name", "action_error", "copied", "fields"]) url.searchParams.delete(k);
   for (const [k, v] of Object.entries(extra)) url.searchParams.set(k, v);
   return `${url.pathname}${url.search}`;
 }
