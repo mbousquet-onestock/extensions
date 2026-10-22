@@ -52,7 +52,7 @@ Table existante utilisée : `settings` (`key`, `value`, `updated_at`, `site_id`,
 | `SETTINGS_API_KEYS` | Clé(s) d'accès à l'API `/api/settings`, séparées par des virgules (`openssl rand -hex 32`). Sans clé, l'API est désactivée (503). |
 | `ONESTOCK_ENVIRONMENT` | Optionnel : environnement des settings `onestock_api_root` / `onestock_token` à utiliser (sinon « qualif » si l'URL parente le contient, ou le seul environnement disponible, ou prod). |
 | `ONESTOCK_API_VERSION` | Optionnel : version ajoutée à `onestock_api_root` (ex. `v3`). Par défaut l'URL est utilisée telle quelle. |
-| `NEON_API_KEY` | Optionnel : clé API Neon, pour désigner les bases par leur nom dans l'onglet Copie de base (`NEON_ORG_ID` en plus avec une clé personnelle). |
+| `NEON_API_KEY` | Optionnel : clé API Neon, pour proposer aussi dans l'onglet Copie de base les bases Neon non reliées au projet (`NEON_ORG_ID` en plus avec une clé personnelle). |
 | `ADMIN_PASSWORD` | Optionnel : authentification basique sur toutes les pages (peu adaptée à l'affichage en iframe). |
 
 ## Démarrage
@@ -111,9 +111,12 @@ Réponses : `{ "settings": [...], "count": n }` (liste), `{ "setting": {...} }` 
 
 ## Copier une base vers une autre
 
-**Depuis l'application** : onglet **Copie de base**. Saisir le **nom** de la base d'origine et celui de la base de destination, tels qu'affichés dans Vercel (Storage) ou Neon — l'autocomplétion propose les bases disponibles —, choisir le mode, **Analyser** (tables et nombre de lignes, rien n'est écrit), cocher les tables, recopier le nom de la base de destination pour confirmer, **Copier**. L'application obtient elle-même l'URL de connexion directe via l'API Neon ; les URL ne sont ni affichées ni enregistrées (Logs API, « Copie de base », indique les noms et hôtes).
+**Depuis l'application** : onglet **Copie de base**. Saisir le **nom** de la base d'origine et celui de la base de destination (l'autocomplétion propose les bases disponibles), choisir le mode, **Analyser** (tables et nombre de lignes, rien n'est écrit), cocher les tables, recopier le nom de la base de destination pour confirmer, **Copier**. Les URL ne sont ni affichées ni enregistrées (Logs API, « Copie de base », indique les noms et hôtes).
 
-Configuration unique : variable `NEON_API_KEY` dans Vercel (clé créée dans la console Neon — Vercel → Storage → la base → « Open in Neon » → Organization settings → API keys —, de préférence une clé d'organisation ; avec une clé personnelle, ajouter `NEON_ORG_ID`). Sans cette clé, l'onglet accepte une URL de connexion à la place du nom. Un nom ambigu (plusieurs bases dans un même projet) se précise en « projet / base », une branche autre que celle par défaut en « projet @branche ».
+Bases proposées, sans configuration :
+- **bases reliées au projet Vercel** (Storage → la base → *Connect Project*) : Vercel crée leurs variables de connexion avec le préfixe choisi (`PROD_DATABASE_URL_UNPOOLED`…) ; ce préfixe devient le nom (`prod`), la base de l'application (sans préfixe) s'appelle `app` ;
+- en option, toutes les bases Neon du compte si `NEON_API_KEY` est définie (clé créée dans la console Neon → Organization settings → API keys ; `NEON_ORG_ID` en plus avec une clé personnelle) ;
+- à défaut, une URL de connexion peut être collée à la place du nom.
 
 Une copie volumineuse est limitée par la durée maximale d'une fonction Vercel (5 min) ; au-delà, utiliser le script ci-dessous.
 

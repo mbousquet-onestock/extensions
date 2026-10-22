@@ -1,6 +1,7 @@
 import CopyPanel, { type CopyLabels } from "@/components/CopyPanel";
 import { Alert } from "@/components/ui";
 import { getT, type MessageKey } from "@/lib/i18n";
+import { connectedDatabases } from "@/lib/connectedDbs";
 import { listNeonDatabases, neonEnabled } from "@/lib/neon";
 
 export const dynamic = "force-dynamic";
@@ -20,12 +21,13 @@ export default async function CopyPage({ searchParams }: { searchParams: Promise
   const t = getT(params.lang);
   const labels = Object.fromEntries(LABEL_KEYS.map((k) => [k, t(`copy.${k}` as MessageKey)])) as CopyLabels;
 
-  // Noms des bases Neon proposés à la saisie (autocomplétion).
-  let databases: string[] = [];
+  // Noms proposés à la saisie : bases reliées au projet Vercel, puis bases Neon si une clé API est configurée.
+  const connected = connectedDatabases();
+  let databases: string[] = connected.map((d) => d.name);
   let neonError: string | null = null;
   if (neonEnabled()) {
     try {
-      databases = (await listNeonDatabases()).map((d) => d.label);
+      databases = [...new Set([...databases, ...(await listNeonDatabases()).map((d) => d.label)])];
     } catch (e) {
       neonError = (e as Error).message;
     }
@@ -39,7 +41,7 @@ export default async function CopyPage({ searchParams }: { searchParams: Promise
           <p className="page-subtitle">{t("copy.subtitle")}</p>
         </div>
       </div>
-      {!neonEnabled() && <Alert type="info">{t("copy.neonSetup")}</Alert>}
+      {databases.length < 2 && <Alert type="info">{t("copy.connectHint")}</Alert>}
       {neonError && <Alert type="danger">{t("copy.neonError", { error: neonError })}</Alert>}
       <CopyPanel labels={labels} databases={databases} />
     </div>

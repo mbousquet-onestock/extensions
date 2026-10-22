@@ -2,6 +2,7 @@
 
 import { logApiCallLater } from "@/lib/apiLogs";
 import { analyzeCopy, describeUrl, runCopy, type CopyPlanItem, type CopyResult } from "@/lib/dbCopy.mjs";
+import { connectedDatabaseUrl } from "@/lib/connectedDbs";
 import { DatabaseNameError, findNeonDatabase, neonConnectionUrl, neonEnabled } from "@/lib/neon";
 
 export type CopyState = {
@@ -21,11 +22,16 @@ export type CopyState = {
 const text = (form: FormData, key: string) => String(form.get(key) ?? "").trim();
 const isPostgresUrl = (u: string) => /^postgres(ql)?:\/\/[^\s]+$/i.test(u);
 
-/** Base saisie par son nom (API Neon) ou, à défaut, par son URL de connexion. */
+/**
+ * Base saisie par son nom — base reliée au projet Vercel, puis base Neon (si NEON_API_KEY) —
+ * ou, à défaut, par son URL de connexion.
+ */
 async function resolve(input: string): Promise<{ url: string; name: string; host: string }> {
   if (isPostgresUrl(input)) return { url: input, name: describeUrl(input), host: describeUrl(input) };
   if (!input) throw new DatabaseNameError("not_found", "");
-  if (!neonEnabled()) throw new Error("neon_disabled");
+  const connected = connectedDatabaseUrl(input);
+  if (connected) return { url: connected.url, name: connected.name, host: connected.host };
+  if (!neonEnabled()) throw new DatabaseNameError("not_found", input);
   const db = await findNeonDatabase(input);
   const url = await neonConnectionUrl(db);
   return { url, name: db.label, host: describeUrl(url) };
