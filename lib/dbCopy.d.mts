@@ -11,6 +11,7 @@ export type CopyResult = {
 };
 
 export function describeUrl(url: string): string;
+export function directUrl(url: string): string;
 
 export function analyzeCopy(options: {
   sourceUrl: string;

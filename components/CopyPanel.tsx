@@ -5,10 +5,10 @@ import { copyStep, type CopyState } from "@/app/copy/actions";
 import { Alert, Icon } from "@/components/ui";
 
 export type CopyLabels = Record<
-  | "source" | "target" | "urlHelp" | "mode" | "modeReplace" | "modeReplaceHelp" | "modeAppend" | "modeAppendHelp"
+  | "source" | "target" | "nameHelp" | "namePlaceholder" | "mode" | "modeReplace" | "modeReplaceHelp" | "modeAppend" | "modeAppendHelp"
   | "analyze" | "analyzing" | "planTitle" | "colTable" | "colRows" | "colTarget" | "created" | "replaced"
   | "kept" | "confirmLabel" | "confirmHelp" | "copy" | "copying" | "doneTitle" | "colCopied" | "duration" | "warning"
-  | "err.url" | "err.connect" | "err.same" | "err.analyze_first" | "err.confirm" | "err.no_tables" | "err.copy_failed"
+  | "err.not_found" | "err.ambiguous" | "err.neon_disabled" | "err.neon" | "err.connect" | "err.same" | "err.analyze_first" | "err.confirm" | "err.no_tables" | "err.copy_failed"
   | "selectAll" | "selectNone" | "createdDone",
   string
 >;
@@ -20,28 +20,33 @@ function hostOf(url: string) {
   try {
     const u = new URL(url.trim());
     if (!/^postgres(ql)?:$/.test(u.protocol)) return "";
-    return `${u.hostname}/${u.pathname.slice(1) || "postgres"}`;
+    // Neon : l'URL poolée et l'URL directe désignent la même base (la copie passe par l'URL directe).
+    const host = u.hostname.endsWith(".neon.tech") ? u.hostname.replace("-pooler.", ".") : u.hostname;
+    return `${host}/${u.pathname.slice(1) || "postgres"}`;
   } catch {
     return "";
   }
 }
 
-export default function CopyPanel({ labels }: { labels: CopyLabels }) {
+const isUrl = (v: string) => /^postgres(ql)?:\/\//i.test(v.trim());
+
+export default function CopyPanel({ labels, databases }: { labels: CopyLabels; databases: string[] }) {
   const [state, action, pending] = useActionState<CopyState, FormData>(copyStep, { step: "idle" });
   const [source, setSource] = useState("");
   const [target, setTarget] = useState("");
   const [mode, setMode] = useState<"replace" | "append">("replace");
   const [selected, setSelected] = useState<string[] | null>(null);
 
-  // Le plan affiché ne vaut que pour les bases analysées.
-  const planValid = state.step !== "idle" && state.sourceHost === hostOf(source) && state.targetHost === hostOf(target);
+  // Le plan affiché ne vaut que pour les bases analysées (mêmes saisies).
+  const [analyzedFor, setAnalyzedFor] = useState<string | null>(null);
+  const planValid = state.step !== "idle" && analyzedFor === `${source.trim()}\n${target.trim()}`;
   const plan = planValid ? state.plan ?? [] : [];
   const checked = selected ?? plan.map((p) => p.table);
   const errorKey = state.error?.split(":")[0];
   const errorLabel = errorKey ? (labels as Record<string, string>)[`err.${errorKey}`] : undefined;
   const errorText = state.error
     ? errorLabel
-      ? errorLabel + (errorKey === "copy_failed" || errorKey === "connect" ? ` ${state.error.slice(errorKey.length + 1)}` : "")
+      ? errorLabel + (state.error.includes(":") ? ` ${state.error.slice(errorKey!.length + 1).trim()}` : "")
       : state.error
     : null;
 
@@ -53,34 +58,44 @@ export default function CopyPanel({ labels }: { labels: CopyLabels }) {
       onSubmit={(e) => {
         e.preventDefault();
         const data = new FormData(e.currentTarget, (e.nativeEvent as SubmitEvent).submitter);
+        if (data.get("intent") === "analyze") setAnalyzedFor(`${source.trim()}\n${target.trim()}`);
         startTransition(() => action(data));
       }}
     >
       <div className="card">
         <div className="form-grid">
+          <datalist id="neon-databases">
+            {databases.map((d) => (
+              <option key={d} value={d} />
+            ))}
+          </datalist>
           {(
             [
-              ["source_url", labels.source, source, setSource],
-              ["target_url", labels.target, target, setTarget],
+              ["source", labels.source, source, setSource],
+              ["target", labels.target, target, setTarget],
             ] as const
           ).map(([name, label, value, set]) => (
-            <label className="field full" key={name}>
+            <label className="field" key={name}>
               <span className="field-label">{label}</span>
               <input
-                className="input mono"
-                type="password"
+                className="input"
+                // Une URL collée (repli sans clé Neon) est masquée : elle contient le mot de passe.
+                type={isUrl(value) ? "password" : "text"}
                 name={name}
+                list="neon-databases"
                 required
                 autoComplete="off"
                 spellCheck={false}
-                placeholder="postgresql://user:password@host/neondb?sslmode=require"
+                placeholder={labels.namePlaceholder}
                 value={value}
                 onChange={(e) => {
                   set(e.target.value);
                   setSelected(null);
                 }}
               />
-              <span className="field-help">{hostOf(value) ? <span className="mono">{hostOf(value)}</span> : labels.urlHelp}</span>
+              <span className="field-help">
+                {isUrl(value) && hostOf(value) ? <span className="mono">{hostOf(value)}</span> : labels.nameHelp}
+              </span>
             </label>
           ))}
           <fieldset className="field full radio-group">
@@ -96,7 +111,7 @@ export default function CopyPanel({ labels }: { labels: CopyLabels }) {
           </fieldset>
         </div>
         <div className="row-end">
-          <button className="btn btn-secondary" type="submit" name="intent" value="analyze" disabled={pending || !hostOf(source) || !hostOf(target)}>
+          <button className="btn btn-secondary" type="submit" name="intent" value="analyze" disabled={pending || !source.trim() || !target.trim()}>
             <Icon name="search" />
             {pending ? labels.analyzing : labels.analyze}
           </button>
@@ -109,7 +124,7 @@ export default function CopyPanel({ labels }: { labels: CopyLabels }) {
         <div className="card flush">
           <div className="toolbar">
             <h2 className="section-title" style={{ flex: 1 }}>
-              {fill(labels.planTitle, { source: state.sourceHost ?? "", target: state.targetHost ?? "" })}
+              {fill(labels.planTitle, { source: state.sourceName ?? "", target: state.targetName ?? "" })}
             </h2>
             <button type="button" className="btn btn-tertiary btn-small" onClick={() => setSelected(plan.map((p) => p.table))}>{labels.selectAll}</button>
             <button type="button" className="btn btn-tertiary btn-small" onClick={() => setSelected([])}>{labels.selectNone}</button>
@@ -154,8 +169,8 @@ export default function CopyPanel({ labels }: { labels: CopyLabels }) {
             {mode === "replace" && <Alert type="danger">{labels.warning}</Alert>}
             <label className="field">
               <span className="field-label">{labels.confirmLabel}</span>
-              <input className="input mono" name="confirm" autoComplete="off" placeholder="COPIER" />
-              <span className="field-help">{labels.confirmHelp}</span>
+              <input className="input mono" name="confirm" autoComplete="off" placeholder={state.targetName} />
+              <span className="field-help">{fill(labels.confirmHelp, { target: state.targetName ?? "" })}</span>
             </label>
             <div className="row-end">
               <button className="btn btn-primary" type="submit" name="intent" value="copy" disabled={pending || checked.length === 0}>
