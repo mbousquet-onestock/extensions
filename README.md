@@ -110,7 +110,18 @@ Réponses : `{ "settings": [...], "count": n }` (liste), `{ "setting": {...} }` 
 
 ## Copier une base vers une autre
 
-`npm run db:copy` copie les tables d'une base Postgres (Neon / Vercel) vers une autre, sans `pg_dump`.
+**Depuis l'application** : onglet **Copie de base**. Choisir la base d'origine et la base de destination dans les listes, le mode, saisir le mot de passe de copie, **Analyser** (tables et nombre de lignes, rien n'est écrit), cocher les tables, taper `COPIER`, **Copier**. Chaque copie est tracée dans Logs API (« Copie de base »).
+
+Configuration dans les variables d'environnement Vercel (puis redéployer) :
+
+| Variable | Rôle |
+| --- | --- |
+| `COPY_ADMIN_PASSWORD` | Mot de passe demandé pour analyser et copier. Sans lui, l'onglet est désactivé. |
+| `COPY_DB_<NOM>` | Une variable par base proposée, valeur = URL de connexion **directe** (ex. `COPY_DB_QUALIF`, `COPY_DB_PROD`). Les URL ne sont jamais envoyées au navigateur ; seuls le nom et l'hôte sont affichés. |
+
+Une copie volumineuse est limitée par la durée maximale d'une fonction Vercel (5 min configurées) ; au-delà, utiliser le script ci-dessous.
+
+**En ligne de commande** : `npm run db:copy` copie les tables d'une base Postgres (Neon / Vercel) vers une autre, sans `pg_dump`.
 
 ```bash
 SOURCE_DATABASE_URL="postgresql://…@ep-source….neon.tech/neondb?sslmode=require" \

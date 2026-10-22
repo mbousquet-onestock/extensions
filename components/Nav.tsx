@@ -9,6 +9,7 @@ const LINKS: { href: string; label: MessageKey; match: (p: string) => boolean }[
   { href: "/", label: "nav.extensions", match: (p) => p === "/" || p.startsWith("/extensions") },
   { href: "/settings", label: "nav.settings", match: (p) => p === "/settings" },
   { href: "/logs", label: "nav.logs", match: (p) => p === "/logs" },
+  { href: "/copy", label: "nav.copy", match: (p) => p === "/copy" },
 ];
 
 export default function Nav() {
