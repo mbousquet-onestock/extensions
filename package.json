@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "db:migrate": "node scripts/migrate.mjs",
-    "secrets:encrypt": "node scripts/encrypt-secrets.mjs"
+    "secrets:encrypt": "node scripts/encrypt-secrets.mjs",
+    "db:copy": "node scripts/copy-db.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
@@ -19,6 +20,7 @@
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "pg": "^8.23.1",
     "typescript": "^5"
   }
 }

@@ -107,3 +107,29 @@ curl -H "$AUTH" -X DELETE "$API/item?key=default_lang&site_id=o0057&extension_id
 ```
 
 Réponses : `{ "settings": [...], "count": n }` (liste), `{ "setting": {...} }` (un setting), `{ "deleted": true }` ; erreurs `{ "error": "…" }` avec 400 (champ manquant, JSON invalide), 401 (clé absente ou invalide), 404, 409 (déjà existant), 500 (`encryption_key_missing` si `SETTINGS_ENCRYPTION_KEY` manque pour une clé sensible), 503 (API désactivée). Un setting renvoyé contient `key`, `site_id`, `extension_id`, `environment`, `scope`, `value`, `updated_at`, `secret`, `encrypted` (et `decrypt_error` si le déchiffrement a échoué).
+
+## Copier une base vers une autre
+
+`npm run db:copy` copie les tables d'une base Postgres (Neon / Vercel) vers une autre, sans `pg_dump`.
+
+```bash
+SOURCE_DATABASE_URL="postgresql://…@ep-source….neon.tech/neondb?sslmode=require" \
+TARGET_DATABASE_URL="postgresql://…@ep-cible….neon.tech/neondb?sslmode=require" \
+npm run db:copy -- --dry-run          # voir ce qui sera copié, sans rien écrire
+npm run db:copy                        # copier (confirmation demandée : taper COPIER)
+```
+
+| Option | Effet |
+| --- | --- |
+| `--tables=settings,extensions` | Tables à copier (défaut : toutes les tables du schéma) |
+| `--mode=replace` | Défaut : vide les tables de la cible puis les remplit |
+| `--mode=append` | Ajoute les lignes, garde celles déjà présentes dans la cible (même clé) |
+| `--no-create` | Ne crée pas les tables absentes de la cible |
+| `--schema=public` | Schéma à copier |
+| `--dry-run` / `--yes` | Simulation / pas de confirmation |
+
+- Utiliser les URL **directes** (hôte sans `-pooler`, variable `DATABASE_URL_UNPOOLED` sur Vercel) ; les passer en variables d'environnement, jamais dans un fichier commité.
+- Les tables absentes de la cible sont créées à l'identique : colonnes, valeurs par défaut, colonnes générées, identités, clés primaires, contraintes, index et clés étrangères.
+- Toute la copie se fait dans **une seule transaction** : en cas d'erreur, la cible reste inchangée. La source est lue dans un instantané cohérent.
+- Les colonnes générées (ex. `scope`) sont recalculées par la cible ; les séquences (`serial`, `identity`) sont recalées sur la valeur maximale copiée.
+- Les valeurs chiffrées (`onestock_token`…) sont copiées telles quelles : l'application branchée sur la cible doit avoir la même `SETTINGS_ENCRYPTION_KEY`.
