@@ -3,11 +3,10 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CONTEXT_KEYS } from "@/lib/context";
-import { getT, resolveLang, type MessageKey } from "@/lib/i18n";
+import { getT, resolveLang } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 
 type Shared = Record<string, unknown>;
-type Verify = { status: "valid" | "invalid" | "not_configured" | "pending"; reason?: string };
 
 const SECRET = /token|secret|password|passwd|api_?key|credential/i;
 
@@ -32,14 +31,13 @@ function parentOrigin(parentUrl: string | null) {
 
 /**
  * Récupère le contexte OneStock : paramètres d'URL de l'iframe, puis handshake
- * `extension_ready` → `onestock_data`, et vérifie la signature côté serveur.
+ * `extension_ready` → `onestock_data` (site, URL de l'API…).
  */
 export default function OneStockContext() {
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
   const [shared, setShared] = useState<Shared | null>(null);
-  const [verify, setVerify] = useState<Verify | null>(null);
   const [siteInput, setSiteInput] = useState("");
   const lang = params.get("lang");
   const t = getT(lang);
@@ -68,20 +66,6 @@ export default function OneStockContext() {
         next.set("site_id", site);
         router.replace(`${pathname}?${next}`);
       }
-
-      setVerify({ status: "pending" });
-      fetch("/api/verify", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          extension_signature: data.extension_signature,
-          extension_id: data.extension_id ?? params.get("extension_id"),
-          user_id: data.user_id ?? params.get("user_id"),
-        }),
-      })
-        .then((r) => r.json())
-        .then(setVerify)
-        .catch(() => setVerify({ status: "invalid", reason: "failed" }));
     };
 
     window.addEventListener("message", onMessage);
@@ -107,21 +91,6 @@ export default function OneStockContext() {
   const urlContext = CONTEXT_KEYS.filter((k) => params.get(k)).map((k) => [k, params.get(k)!]);
   const siteId = params.get("site_id");
   const [open, setOpen] = useState(false);
-
-  const badge = !inIframe
-    ? { cls: "badge-grey", label: t("ctx.outside") }
-    : !verify || verify.status === "pending"
-      ? { cls: "badge-grey", label: shared ? t("ctx.verifying") : t("ctx.waiting") }
-      : verify.status === "valid"
-        ? { cls: "badge-green", label: t("ctx.valid") }
-        : verify.status === "not_configured"
-          ? { cls: "badge-orange", label: t("ctx.notConfigured") }
-          : {
-              cls: "badge-red",
-              label: t("ctx.invalid", {
-                reason: verify.reason === "failed" ? t("ctx.verifyFailed") : t(`ctx.reason.${verify.reason}` as MessageKey),
-              }),
-            };
 
   const items: [string, string | null][] = [
     [t("ctx.user"), params.get("user_id")],
@@ -166,7 +135,6 @@ export default function OneStockContext() {
               {label} <strong>{v}</strong>
             </span>
           ))}
-        <span className={`badge ${badge.cls}`}>{badge.label}</span>
         <span className="spacer" />
         <button className="btn btn-tertiary btn-small" type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
           {t("ctx.details")}

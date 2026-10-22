@@ -2,7 +2,7 @@
 
 App Next.js (déployée sur Vercel) chargée en iframe dans OneStock comme UI extension.
 
-- **Contexte** : récupère les paramètres d'URL envoyés par OneStock (`site_id`, `extension_id`, `user_id`, `lang`, `host_app`, `parent_url`, …), fait le handshake `extension_ready` → `onestock_data` par postMessage et vérifie `extension_signature` (HMAC-SHA256 de `${t}.${extension_id}##${user_id}`, valable 6 h) côté serveur. Le contexte est affiché en haut de chaque page et conservé dans les liens. Hors OneStock, on peut saisir un `site_id` à la main.
+- **Contexte** : récupère les paramètres d'URL envoyés par OneStock (`site_id`, `extension_id`, `user_id`, `lang`, `host_app`, `parent_url`, …), fait le handshake `extension_ready` → `onestock_data` par postMessage (la signature `extension_signature` n'est pas contrôlée). Le contexte est affiché en haut de chaque page et conservé dans les liens. Hors OneStock, on peut saisir un `site_id` à la main.
 - **Extensions** (`/`) : les extensions installées sur le `site_id` du contexte viennent de l'API OneStock — `POST {onestock_api_root}/extensions/query` puis `GET {onestock_api_root}/extensions/{id}` (corps `{ site_id, token }`, token = setting global `onestock_token`) : icône, points d'injection, URL de production / test, dernière mise à jour. Elles sont rapprochées du catalogue commun en base **par le nom** (l'id OneStock est généré à la création sur chaque environnement) ; un badge signale les champs qui diffèrent (url, test_url, icon, injection_points). La modale de modification affiche toutes les données de l'API (id, dates, URL, icônes, points d'injection, JSON complet) à côté du formulaire du catalogue ; une extension installée hors catalogue peut y être ajoutée en un clic, formulaire prérempli. La création reprend les champs de l'API : nom, icône (base64, 100 Ko max), url, test_url et points d'injection (anchor, name, slug, path, icône). Chaque appel est enregistré dans `api_logs` (token masqué, icônes base64 remplacées par un libellé).
 
   Actions sur chaque ligne (avec confirmation pour l'environnement) :
@@ -48,7 +48,6 @@ Table existante utilisée : `settings` (`key`, `value`, `updated_at`, `site_id`,
 | Variable | Rôle |
 | --- | --- |
 | `DATABASE_URL` / `POSTGRES_URL` | Connexion à la base Postgres Vercel (Neon). |
-| `EXTENSION_SECRETS` | Clé(s) secrète(s) OneStock pour vérifier la signature, séparées par des virgules. Sans elle, la signature n'est pas vérifiée. |
 | `SETTINGS_ENCRYPTION_KEY` | **Obligatoire** pour enregistrer une valeur sensible : clé de chiffrement AES-256 (`openssl rand -hex 32`). À conserver précieusement : sans elle, les valeurs chiffrées sont illisibles. |
 | `SETTINGS_API_KEYS` | Clé(s) d'accès à l'API `/api/settings`, séparées par des virgules (`openssl rand -hex 32`). Sans clé, l'API est désactivée (503). |
 | `ONESTOCK_ENVIRONMENT` | Optionnel : environnement des settings `onestock_api_root` / `onestock_token` à utiliser (sinon « qualif » si l'URL parente le contient, ou le seul environnement disponible, ou prod). |
