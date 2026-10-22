@@ -3,39 +3,47 @@
 import { startTransition, useActionState, useState } from "react";
 import { copyStep, type CopyState } from "@/app/copy/actions";
 import { Alert, Icon } from "@/components/ui";
-import type { CopyDatabase } from "@/lib/copyConfig";
 
 export type CopyLabels = Record<
-  | "source" | "target" | "choose" | "mode" | "modeReplace" | "modeReplaceHelp" | "modeAppend" | "modeAppendHelp"
-  | "password" | "analyze" | "analyzing" | "planTitle" | "colTable" | "colRows" | "colTarget" | "created" | "replaced"
+  | "source" | "target" | "urlHelp" | "mode" | "modeReplace" | "modeReplaceHelp" | "modeAppend" | "modeAppendHelp"
+  | "analyze" | "analyzing" | "planTitle" | "colTable" | "colRows" | "colTarget" | "created" | "replaced"
   | "kept" | "confirmLabel" | "confirmHelp" | "copy" | "copying" | "doneTitle" | "colCopied" | "duration" | "warning"
-  | "err.password" | "err.select" | "err.same" | "err.analyze_first" | "err.confirm" | "err.no_tables" | "err.copy_failed"
+  | "err.url" | "err.connect" | "err.same" | "err.analyze_first" | "err.confirm" | "err.no_tables" | "err.copy_failed"
   | "selectAll" | "selectNone" | "createdDone",
   string
 >;
 
 const fill = (s: string, vars: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""));
 
-export default function CopyPanel({ databases, labels }: { databases: CopyDatabase[]; labels: CopyLabels }) {
+/** Hôte et base d'une URL Postgres, pour vérifier la saisie sans afficher le mot de passe. */
+function hostOf(url: string) {
+  try {
+    const u = new URL(url.trim());
+    if (!/^postgres(ql)?:$/.test(u.protocol)) return "";
+    return `${u.hostname}/${u.pathname.slice(1) || "postgres"}`;
+  } catch {
+    return "";
+  }
+}
+
+export default function CopyPanel({ labels }: { labels: CopyLabels }) {
   const [state, action, pending] = useActionState<CopyState, FormData>(copyStep, { step: "idle" });
-  const [password, setPassword] = useState("");
   const [source, setSource] = useState("");
   const [target, setTarget] = useState("");
   const [mode, setMode] = useState<"replace" | "append">("replace");
   const [selected, setSelected] = useState<string[] | null>(null);
 
   // Le plan affiché ne vaut que pour les bases analysées.
-  const planValid = state.step !== "idle" && state.source === source && state.target === target;
+  const planValid = state.step !== "idle" && state.sourceHost === hostOf(source) && state.targetHost === hostOf(target);
   const plan = planValid ? state.plan ?? [] : [];
   const checked = selected ?? plan.map((p) => p.table);
   const errorKey = state.error?.split(":")[0];
   const errorLabel = errorKey ? (labels as Record<string, string>)[`err.${errorKey}`] : undefined;
   const errorText = state.error
     ? errorLabel
-      ? errorLabel + (errorKey === "copy_failed" ? ` ${state.error.slice("copy_failed:".length)}` : "")
+      ? errorLabel + (errorKey === "copy_failed" || errorKey === "connect" ? ` ${state.error.slice(errorKey.length + 1)}` : "")
       : state.error
     : null;
-  const host = (name: string) => databases.find((d) => d.name === name)?.host ?? "";
 
   return (
     <form
@@ -50,26 +58,31 @@ export default function CopyPanel({ databases, labels }: { databases: CopyDataba
     >
       <div className="card">
         <div className="form-grid">
-          <label className="field">
-            <span className="field-label">{labels.source}</span>
-            <select className="select" name="source" value={source} required onChange={(e) => { setSource(e.target.value); setSelected(null); }}>
-              <option value="">{labels.choose}</option>
-              {databases.map((d) => (
-                <option key={d.name} value={d.name}>{d.label}</option>
-              ))}
-            </select>
-            {source && <span className="field-help mono">{host(source)}</span>}
-          </label>
-          <label className="field">
-            <span className="field-label">{labels.target}</span>
-            <select className="select" name="target" value={target} required onChange={(e) => { setTarget(e.target.value); setSelected(null); }}>
-              <option value="">{labels.choose}</option>
-              {databases.filter((d) => d.name !== source).map((d) => (
-                <option key={d.name} value={d.name}>{d.label}</option>
-              ))}
-            </select>
-            {target && <span className="field-help mono">{host(target)}</span>}
-          </label>
+          {(
+            [
+              ["source_url", labels.source, source, setSource],
+              ["target_url", labels.target, target, setTarget],
+            ] as const
+          ).map(([name, label, value, set]) => (
+            <label className="field full" key={name}>
+              <span className="field-label">{label}</span>
+              <input
+                className="input mono"
+                type="password"
+                name={name}
+                required
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="postgresql://user:password@host/neondb?sslmode=require"
+                value={value}
+                onChange={(e) => {
+                  set(e.target.value);
+                  setSelected(null);
+                }}
+              />
+              <span className="field-help">{hostOf(value) ? <span className="mono">{hostOf(value)}</span> : labels.urlHelp}</span>
+            </label>
+          ))}
           <fieldset className="field full radio-group">
             <legend className="field-label">{labels.mode}</legend>
             <label className="radio">
@@ -81,13 +94,9 @@ export default function CopyPanel({ databases, labels }: { databases: CopyDataba
               <span><strong>{labels.modeAppend}</strong> — {labels.modeAppendHelp}</span>
             </label>
           </fieldset>
-          <label className="field">
-            <span className="field-label">{labels.password}</span>
-            <input className="input" type="password" name="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
-          </label>
         </div>
         <div className="row-end">
-          <button className="btn btn-secondary" type="submit" name="intent" value="analyze" disabled={pending || !source || !target}>
+          <button className="btn btn-secondary" type="submit" name="intent" value="analyze" disabled={pending || !hostOf(source) || !hostOf(target)}>
             <Icon name="search" />
             {pending ? labels.analyzing : labels.analyze}
           </button>
