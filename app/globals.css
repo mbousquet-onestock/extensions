@@ -319,3 +319,10 @@ pre.code { margin: 6px 0 0; padding: 8px; background: var(--neutral-30); border-
 .sk-cell { height: 14px; }
 @keyframes sk-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
 @media (prefers-reduced-motion: reduce) { .sk { animation: none; } }
+
+/* Actions de ligne en emplacements fixes : les icônes restent alignées en colonnes d'une ligne à l'autre. */
+.actions-grid { display: grid; grid-template-columns: 104px repeat(3, 32px); gap: 4px; align-items: center; justify-content: end; }
+.actions-grid .slot { display: flex; align-items: center; justify-content: center; min-height: 32px; }
+.actions-grid .slot form { display: contents; }
+.actions-grid .slot.primary .btn { width: 100%; }
+.table td.actions-col { vertical-align: middle; }

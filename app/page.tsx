@@ -331,73 +331,83 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
                       </td>
                     )}
                     <td className="actions-col">
-                      <div className="actions">
-                        {os && (
-                          <Link
-                            href={withContext(`/extensions/${encodeURIComponent(os.id)}/settings`, params)}
-                            className="btn btn-secondary btn-small"
-                          >
-                            <Icon name="settings" />
-                            {t("ext.colSettings")}
-                          </Link>
-                        )}
-                        {/* Environnement OneStock : installer une extension du catalogue */}
-                        {siteId && environment && !os && row.catalog && (
-                          <form action={installOnEnvironment}>
-                            <ActionFields params={params} back={here} name={row.name} />
-                            <input type="hidden" name="id" value={row.catalog.id} />
-                            <ConfirmButton
+                      {/* Emplacements fixes : bouton principal · modifier · catalogue · environnement,
+                          pour que les mêmes actions restent alignées d'une ligne à l'autre. */}
+                      <div className="actions-grid">
+                        <div className="slot primary">
+                          {os && (
+                            <Link
+                              href={withContext(`/extensions/${encodeURIComponent(os.id)}/settings`, params)}
                               className="btn btn-secondary btn-small"
-                              message={t("ext.confirmInstallEnv", { name: row.name, env: environment, site: siteId })}
-                              title={t("ext.installEnvTitle", { env: environment })}
                             >
-                              <Icon name="download" />
-                              {t("ext.install")}
-                            </ConfirmButton>
-                          </form>
-                        )}
-                        <Link
-                          href={withContext("/", params, { ...view, edit: row.key })}
-                          className="btn btn-icon"
-                          title={t("common.edit")}
-                          aria-label={t("common.edit")}
-                          scroll={false}
-                        >
-                          <Icon name="edit" />
-                        </Link>
-                        {/* Catalogue (base Vercel) : ajouter une extension installée / supprimer */}
-                        {os && !row.catalog && (
-                          <form action={addToCatalog}>
-                            <ActionFields params={params} back={here} name={row.name} />
-                            <input type="hidden" name="os_id" value={os.id} />
-                            <button type="submit" className="btn btn-icon brand" title={t("ext.addToCatalog")} aria-label={t("ext.addToCatalog")}>
-                              <Icon name="bookmark" />
-                            </button>
-                          </form>
-                        )}
-                        {row.catalog && (
-                          <form action={deleteExtension}>
-                            <input type="hidden" name="back" value={here} />
-                            <input type="hidden" name="name" value={row.name} />
-                            <input type="hidden" name="id" value={row.catalog.id} />
-                            <ConfirmButton message={t("ext.confirmDelete", { name: row.name })} title={t("ext.removeCatalog")}>
-                              <Icon name="trash" />
-                            </ConfirmButton>
-                          </form>
-                        )}
+                              <Icon name="settings" />
+                              {t("ext.colSettings")}
+                            </Link>
+                          )}
+                          {/* Environnement OneStock : installer une extension du catalogue */}
+                          {siteId && environment && !os && row.catalog && (
+                            <form action={installOnEnvironment}>
+                              <ActionFields params={params} back={here} name={row.name} />
+                              <input type="hidden" name="id" value={row.catalog.id} />
+                              <ConfirmButton
+                                className="btn btn-secondary btn-small"
+                                message={t("ext.confirmInstallEnv", { name: row.name, env: environment, site: siteId })}
+                                title={t("ext.installEnvTitle", { env: environment })}
+                              >
+                                <Icon name="download" />
+                                {t("ext.install")}
+                              </ConfirmButton>
+                            </form>
+                          )}
+                        </div>
+                        <div className="slot">
+                          <Link
+                            href={withContext("/", params, { ...view, edit: row.key })}
+                            className="btn btn-icon"
+                            title={t("common.edit")}
+                            aria-label={t("common.edit")}
+                            scroll={false}
+                          >
+                            <Icon name="edit" />
+                          </Link>
+                        </div>
+                        {/* Catalogue (base Vercel) : ajouter une extension installée / la retirer du catalogue */}
+                        <div className="slot">
+                          {os && !row.catalog && (
+                            <form action={addToCatalog}>
+                              <ActionFields params={params} back={here} name={row.name} />
+                              <input type="hidden" name="os_id" value={os.id} />
+                              <button type="submit" className="btn btn-icon brand" title={t("ext.addToCatalog")} aria-label={t("ext.addToCatalog")}>
+                                <Icon name="bookmark" />
+                              </button>
+                            </form>
+                          )}
+                          {row.catalog && (
+                            <form action={deleteExtension}>
+                              <input type="hidden" name="back" value={here} />
+                              <input type="hidden" name="name" value={row.name} />
+                              <input type="hidden" name="id" value={row.catalog.id} />
+                              <ConfirmButton message={t("ext.confirmDelete", { name: row.name })} title={t("ext.removeCatalog")}>
+                                <Icon name="bookmarkRemove" />
+                              </ConfirmButton>
+                            </form>
+                          )}
+                        </div>
                         {/* Environnement OneStock : désinstaller */}
-                        {os && environment && (
-                          <form action={uninstallFromEnvironment}>
-                            <ActionFields params={params} back={here} name={row.name} />
-                            <input type="hidden" name="os_id" value={os.id} />
-                            <ConfirmButton
-                              message={t("ext.confirmUninstallEnv", { name: row.name, env: environment, site: siteId })}
-                              title={t("ext.uninstallEnvTitle", { env: environment })}
-                            >
-                              <Icon name="unplug" />
-                            </ConfirmButton>
-                          </form>
-                        )}
+                        <div className="slot">
+                          {os && environment && (
+                            <form action={uninstallFromEnvironment}>
+                              <ActionFields params={params} back={here} name={row.name} />
+                              <input type="hidden" name="os_id" value={os.id} />
+                              <ConfirmButton
+                                message={t("ext.confirmUninstallEnv", { name: row.name, env: environment, site: siteId })}
+                                title={t("ext.uninstallEnvTitle", { env: environment })}
+                              >
+                                <Icon name="trash" />
+                              </ConfirmButton>
+                            </form>
+                          )}
+                        </div>
                       </div>
                     </td>
                   </tr>
