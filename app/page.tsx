@@ -262,7 +262,6 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
               <tr>
                 <th>{t("ext.colName")}</th>
                 <th>{t("ext.colInjection")}</th>
-                <th>{t("ext.colLinks")}</th>
                 {siteId && <th>{t("ext.colStatus")}</th>}
                 <th className="actions-col"><span className="sr-only">{t("common.actions")}</span></th>
               </tr>
@@ -271,7 +270,6 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
               {visible.map((row) => {
                 const os = row.installed;
                 const icon = iconSrc(os?.icon ?? row.catalog?.icon ?? undefined);
-                const links = { url: os?.url ?? row.catalog?.url ?? undefined, test: os?.test_url ?? row.catalog?.test_url ?? undefined };
                 return (
                   <tr key={row.key}>
                     <td>
@@ -300,13 +298,6 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
                             ))
                           : row.anchors.map((a) => <span key={a} className="tag">{a}</span>)}
                       </div>
-                    </td>
-                    <td className="nowrap">
-                      {links.url && <a href={links.url} target="_blank" rel="noreferrer" className="link-ext">{t("ext.prod")}</a>}
-                      {links.test && links.test !== links.url && (
-                        <a href={links.test} target="_blank" rel="noreferrer" className="link-ext">{t("ext.test")}</a>
-                      )}
-                      {!links.url && !links.test && <span className="secondary">—</span>}
                     </td>
                     {siteId && (
                       <td className="nowrap">
