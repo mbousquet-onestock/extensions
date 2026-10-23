@@ -1,4 +1,4 @@
-import { HttpError, settingIdFrom, settingsRoute, valueFrom, wantsDecrypt } from "@/lib/settingsApi";
+import { HttpError, settingIdFrom, settingsRoute, valueFrom, wantsDecrypt, withContextApiRoot } from "@/lib/settingsApi";
 import { invalidateFromRoute, SETTINGS_TAG } from "@/lib/cache";
 import { createSetting, listSettings, type SettingFilters } from "@/lib/settings";
 
@@ -21,7 +21,8 @@ export const GET = settingsRoute(async (req) => {
     decrypt: wantsDecrypt(url),
     limit: Number(url.searchParams.get("limit")) || 1000,
   });
-  return { body: { settings, count: settings.length } };
+  const withRoot = settings.map((s) => withContextApiRoot(url, s));
+  return { body: { settings: withRoot, count: withRoot.length } };
 });
 
 /**

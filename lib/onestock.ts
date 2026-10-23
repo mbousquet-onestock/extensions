@@ -8,7 +8,13 @@ import { decryptSecret } from "@/lib/secrets";
 
 // ---------- Identifiants (table settings) ----------
 
-export type Credentials = { apiRoot: string; token: string; environment: string };
+export type Credentials = {
+  apiRoot: string;
+  token: string;
+  environment: string;
+  /** Origine de la racine de l'API : `parent_url` du contexte ou setting `onestock_api_root`. */
+  apiRootSource: "context" | "setting";
+};
 
 /**
  * Lit `onestock_api_root` et `onestock_token` dans settings pour le site (une valeur propre au site
@@ -30,12 +36,39 @@ const credentialRows = (siteId: string) =>
     { tags: [SETTINGS_TAG], revalidate: 300 },
   )();
 
-export async function getCredentials(siteId: string, hint?: string | null): Promise<Credentials | null> {
+/** Hôtes acceptés comme racine de l'API (ONESTOCK_ALLOWED_HOSTS, suffixes séparés par des virgules). */
+const allowedHosts = () =>
+  (process.env.ONESTOCK_ALLOWED_HOSTS || "onestock-retail.com")
+    .split(",")
+    .map((h) => h.trim().toLowerCase().replace(/^\*?\./, ""))
+    .filter(Boolean);
+
+/**
+ * Racine de l'API OneStock = `parent_url` du contexte (origine de la page OneStock qui affiche l'extension).
+ * Le token y étant envoyé, seule une URL https d'un hôte OneStock autorisé est acceptée ; sinon null.
+ */
+export function contextApiRoot(parentUrl?: string | null) {
+  if (!parentUrl) return null;
+  try {
+    const u = new URL(parentUrl);
+    const host = u.hostname.toLowerCase();
+    if (u.protocol !== "https:" || !allowedHosts().some((h) => host === h || host.endsWith(`.${h}`))) return null;
+    return u.origin;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Identifiants OneStock du site : racine de l'API = `parent_url` du contexte (setting `onestock_api_root`
+ * seulement hors OneStock, sans contexte) ; token = setting `onestock_token` de l'environnement.
+ */
+export async function getCredentials(siteId: string, parentUrl?: string | null): Promise<Credentials | null> {
   const rows = await credentialRows(siteId);
   if (rows.length === 0) return null;
 
   const envs = [...new Set(rows.map((r) => r.environment))];
-  const wanted = process.env.ONESTOCK_ENVIRONMENT || (hint && /qualif/i.test(hint) ? "qualif" : undefined);
+  const wanted = process.env.ONESTOCK_ENVIRONMENT || (parentUrl && /qualif/i.test(parentUrl) ? "qualif" : undefined);
   const environment =
     (wanted && envs.find((e) => e === wanted)) ||
     (envs.length === 1 ? envs[0] : envs.find((e) => /^prod/i.test(e)) ?? envs[0]);
@@ -44,11 +77,12 @@ export async function getCredentials(siteId: string, hint?: string | null): Prom
     const candidates = rows.filter((r) => r.key === key && r.environment === environment);
     return (candidates.find((r) => r.site_id === siteId) ?? candidates[0])?.value;
   };
-  const apiRoot = pick("onestock_api_root");
+  const fromContext = contextApiRoot(parentUrl);
+  const apiRoot = fromContext ?? pick("onestock_api_root");
   // Le token est stocké chiffré : il n'est déchiffré qu'ici, côté serveur, pour l'appel à l'API.
   const stored = pick("onestock_token");
   const token = stored ? decryptSecret(stored) : undefined;
-  return apiRoot && token ? { apiRoot, token, environment } : null;
+  return apiRoot && token ? { apiRoot, token, environment, apiRootSource: fromContext ? "context" : "setting" } : null;
 }
 
 /** {{url}} = onestock_api_root (une version, ex. `v3`, peut être ajoutée via ONESTOCK_API_VERSION). */

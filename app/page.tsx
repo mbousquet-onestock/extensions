@@ -83,12 +83,14 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
   let installed: OneStockExtension[] = [];
   let apiProblem: string | null = null;
   let environment: string | null = null;
+  let apiRoot: string | null = null;
   if (siteId && !error) {
     try {
       const creds = await getCredentials(siteId, params.parent_url);
       if (!creds) apiProblem = t("ext.noCredentials", { site: siteId });
       else {
         environment = creds.environment;
+        apiRoot = creds.apiRoot;
         installed = await getInstalledExtensions(creds, siteId);
       }
     } catch (e) {
@@ -183,7 +185,7 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
         <div>
           <h1 className="page-title">{t("ext.title")}</h1>
           <p className="page-subtitle">
-            {siteId && environment ? t("ext.source", { site: siteId, env: environment }) : t("ext.subtitleNoSite")}
+            {siteId && environment ? t("ext.source", { site: siteId, env: environment, api: apiRoot ?? "" }) : t("ext.subtitleNoSite")}
           </p>
         </div>
       </div>

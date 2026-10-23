@@ -1,4 +1,5 @@
-import { HttpError, settingIdFrom, settingsRoute, valueFrom, wantsDecrypt } from "@/lib/settingsApi";
+import { contextApiRoot } from "@/lib/onestock";
+import { HttpError, settingIdFrom, settingsRoute, valueFrom, wantsDecrypt, withContextApiRoot } from "@/lib/settingsApi";
 import { invalidateFromRoute, SETTINGS_TAG } from "@/lib/cache";
 import { createSetting, deleteSetting, readSetting, updateSetting } from "@/lib/settings";
 
@@ -11,8 +12,13 @@ export const dynamic = "force-dynamic";
 export const GET = settingsRoute(async (req) => {
   const url = new URL(req.url);
   const setting = await readSetting(settingIdFrom(url), { decrypt: wantsDecrypt(url) });
-  if (!setting) throw new HttpError(404, "not_found");
-  return { body: { setting } };
+  if (!setting) {
+    // onestock_api_root : sans ligne en base, la racine vient du contexte (?parent_url=) si fournie.
+    const root = settingIdFrom(url).key === "onestock_api_root" ? contextApiRoot(url.searchParams.get("parent_url")) : null;
+    if (root) return { body: { setting: { ...settingIdFrom(url), value: root, from_context: true } } };
+    throw new HttpError(404, "not_found");
+  }
+  return { body: { setting: withContextApiRoot(url, setting) } };
 });
 
 /**

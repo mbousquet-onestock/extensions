@@ -1,4 +1,5 @@
 import { checkApiKey } from "@/lib/apiAuth";
+import { contextApiRoot } from "@/lib/onestock";
 import { logApiCallLater } from "@/lib/apiLogs";
 import { MissingKeyError, isSecretKey } from "@/lib/secrets";
 import type { SettingId } from "@/lib/settings";
@@ -109,3 +110,12 @@ export function valueFrom(v: unknown): string | undefined {
 }
 
 export const wantsDecrypt = (url: URL) => ["1", "true"].includes(url.searchParams.get("decrypt") ?? "");
+
+/**
+ * `onestock_api_root` suit le contexte OneStock : si l'appel fournit `?parent_url=` (hôte OneStock autorisé),
+ * la valeur renvoyée pour ce setting est cette URL (origine), à la place de la valeur stockée.
+ */
+export function withContextApiRoot<T extends { key: string; value: string | null }>(url: URL, setting: T): T {
+  const root = contextApiRoot(url.searchParams.get("parent_url"));
+  return root && setting.key === "onestock_api_root" ? { ...setting, value: root, from_context: true } : setting;
+}

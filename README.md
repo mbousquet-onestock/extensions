@@ -3,6 +3,7 @@
 App Next.js (déployée sur Vercel) chargée en iframe dans OneStock comme UI extension.
 
 - **Contexte** : récupère les paramètres d'URL envoyés par OneStock (`site_id`, `extension_id`, `user_id`, `lang`, `host_app`, `parent_url`, …), fait le handshake `extension_ready` → `onestock_data` par postMessage (la signature `extension_signature` n'est pas contrôlée). Le contexte est affiché en haut de chaque page et conservé dans les liens. Hors OneStock, on peut saisir un `site_id` à la main.
+- **Racine de l'API OneStock** (`{onestock_api_root}` ci-dessous) : toujours le `parent_url` du contexte (ex. `https://admin.eu1.qualif.onestock-retail.com`). Le token y étant envoyé, seule une URL `https` d'un hôte OneStock est acceptée (`*.onestock-retail.com`, réglable avec `ONESTOCK_ALLOWED_HOSTS`) ; hors OneStock (sans contexte), le setting `onestock_api_root` sert de repli. L'environnement des settings (`qualif`…) est déduit du même `parent_url`.
 - **Extensions** (`/`) : les extensions installées sur le `site_id` du contexte viennent de l'API OneStock — `POST {onestock_api_root}/extensions/query` puis `GET {onestock_api_root}/extensions/{id}` (corps `{ site_id, token }`, token = setting global `onestock_token`) : icône, points d'injection, URL de production / test, dernière mise à jour. Elles sont rapprochées du catalogue commun en base **par le nom** (l'id OneStock est généré à la création sur chaque environnement) ; un badge signale les champs qui diffèrent (url, test_url, icon, injection_points). La modale de modification affiche toutes les données de l'API (id, dates, URL, icônes, points d'injection, JSON complet) à côté du formulaire du catalogue ; une extension installée hors catalogue peut y être ajoutée en un clic, formulaire prérempli. La création reprend les champs de l'API : nom, icône (base64, 100 Ko max), url, test_url et points d'injection (anchor, name, slug, path, icône). Chaque appel est enregistré dans `api_logs` (token masqué, icônes base64 remplacées par un libellé).
 
   Actions sur chaque ligne (avec confirmation pour l'environnement) :
@@ -50,6 +51,7 @@ Table existante utilisée : `settings` (`key`, `value`, `updated_at`, `site_id`,
 | `DATABASE_URL` / `POSTGRES_URL` | Connexion à la base Postgres Vercel (Neon), créée par Vercel quand la base est reliée au projet. La première variable contenant une vraie URL `postgresql://…` parmi `DATABASE_URL`, `POSTGRES_URL`, `DATABASE_URL_UNPOOLED`, `POSTGRES_URL_NON_POOLING`, `POSTGRES_PRISMA_URL` est utilisée (une valeur qui n'est pas une URL est ignorée). |
 | `SETTINGS_ENCRYPTION_KEY` | **Obligatoire** pour enregistrer une valeur sensible : clé de chiffrement AES-256 (`openssl rand -hex 32`). À conserver précieusement : sans elle, les valeurs chiffrées sont illisibles. |
 | `SETTINGS_API_KEYS` | Clé(s) d'accès à l'API `/api/settings`, séparées par des virgules (`openssl rand -hex 32`). Sans clé, l'API est désactivée (503). |
+| `ONESTOCK_ALLOWED_HOSTS` | Optionnel : hôtes acceptés comme racine de l'API depuis le `parent_url` du contexte (suffixes séparés par des virgules, défaut `onestock-retail.com`). |
 | `ONESTOCK_ENVIRONMENT` | Optionnel : environnement des settings `onestock_api_root` / `onestock_token` à utiliser (sinon « qualif » si l'URL parente le contient, ou le seul environnement disponible, ou prod). |
 | `ONESTOCK_API_VERSION` | Optionnel : version ajoutée à `onestock_api_root` (ex. `v3`). Par défaut l'URL est utilisée telle quelle. |
 | `NEON_API_KEY` | Optionnel : clé API Neon, pour proposer aussi dans l'onglet Copie de base les bases Neon non reliées au projet (`NEON_ORG_ID` en plus avec une clé personnelle). |
@@ -75,7 +77,7 @@ Les valeurs sensibles sont stockées chiffrées (`enc:v1:…`). Une autre applic
 
 API REST pour lire et modifier la table `settings` depuis d'autres applications. Authentification par clé : `Authorization: Bearer <clé>` (ou en-tête `x-api-key`), clés définies dans `SETTINGS_API_KEYS`. Chaque appel est journalisé dans `api_logs` (API « Settings API », valeurs sensibles masquées).
 
-Un setting est identifié par `key` + `site_id` (vide = global) + `extension_id` + `environment`. Les clés sensibles (`onestock_token`…) sont chiffrées automatiquement à l'écriture ; à la lecture leur `value` vaut `null` sauf avec `?decrypt=1`.
+Un setting est identifié par `key` + `site_id` (vide = global) + `extension_id` + `environment`. Les clés sensibles (`onestock_token`…) sont chiffrées automatiquement à l'écriture ; à la lecture leur `value` vaut `null` sauf avec `?decrypt=1`. En lecture, `?parent_url=<parent_url du contexte>` fait renvoyer pour `onestock_api_root` l'origine de ce `parent_url` (champ `from_context: true`), même sans ligne en base.
 
 | Méthode | URL | Rôle |
 | --- | --- | --- |
