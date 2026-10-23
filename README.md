@@ -47,7 +47,7 @@ Table existante utilisée : `settings` (`key`, `value`, `updated_at`, `site_id`,
 
 | Variable | Rôle |
 | --- | --- |
-| `DATABASE_URL` / `POSTGRES_URL` | Connexion à la base Postgres Vercel (Neon). |
+| `DATABASE_URL` / `POSTGRES_URL` | Connexion à la base Postgres Vercel (Neon), créée par Vercel quand la base est reliée au projet. La première variable contenant une vraie URL `postgresql://…` parmi `DATABASE_URL`, `POSTGRES_URL`, `DATABASE_URL_UNPOOLED`, `POSTGRES_URL_NON_POOLING`, `POSTGRES_PRISMA_URL` est utilisée (une valeur qui n'est pas une URL est ignorée). |
 | `SETTINGS_ENCRYPTION_KEY` | **Obligatoire** pour enregistrer une valeur sensible : clé de chiffrement AES-256 (`openssl rand -hex 32`). À conserver précieusement : sans elle, les valeurs chiffrées sont illisibles. |
 | `SETTINGS_API_KEYS` | Clé(s) d'accès à l'API `/api/settings`, séparées par des virgules (`openssl rand -hex 32`). Sans clé, l'API est désactivée (503). |
 | `ONESTOCK_ENVIRONMENT` | Optionnel : environnement des settings `onestock_api_root` / `onestock_token` à utiliser (sinon « qualif » si l'URL parente le contient, ou le seul environnement disponible, ou prod). |

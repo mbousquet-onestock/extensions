@@ -1,7 +1,13 @@
 import { readFile } from "node:fs/promises";
 import { neon } from "@neondatabase/serverless";
+import { databaseUrl } from "../lib/databaseUrl.mjs";
 
-const url = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
+let url;
+try {
+  url = databaseUrl();
+} catch {
+  url = undefined;
+}
 if (!url) {
   console.error("DATABASE_URL (ou POSTGRES_URL) n'est pas défini.");
   process.exit(1);

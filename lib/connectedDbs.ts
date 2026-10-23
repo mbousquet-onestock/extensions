@@ -1,3 +1,4 @@
+import { isPostgresUrl } from "@/lib/databaseUrl.mjs";
 import { describeUrl, directUrl } from "@/lib/dbCopy.mjs";
 
 // Bases reliées au projet Vercel (Storage → la base → « Connect Project ») : Vercel crée leurs variables
@@ -14,12 +15,12 @@ function scan() {
   const byPrefix = new Map<string, { kind: string; url: string }>();
   for (const [key, value] of Object.entries(process.env)) {
     const m = key.match(URL_VARS);
-    if (!m || !value || !/^postgres(ql)?:\/\//i.test(value)) continue;
+    if (!m || !isPostgresUrl(value)) continue;
     const prefix = m[1] ?? "";
     // Exclut les variables propres à l'application qui ne désignent pas une base reliée.
     if (/^(SOURCE|TARGET|COPY)$/.test(prefix)) continue;
     const current = byPrefix.get(prefix);
-    if (!current || PREFERENCE.indexOf(m[2]) < PREFERENCE.indexOf(current.kind)) byPrefix.set(prefix, { kind: m[2], url: value });
+    if (!current || PREFERENCE.indexOf(m[2]) < PREFERENCE.indexOf(current.kind)) byPrefix.set(prefix, { kind: m[2], url: value!.trim() });
   }
   const seen = new Set<string>();
   const result: (ConnectedDatabase & { url: string })[] = [];

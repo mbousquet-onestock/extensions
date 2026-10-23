@@ -2,8 +2,14 @@
 // Usage : DATABASE_URL=… SETTINGS_ENCRYPTION_KEY=… npm run secrets:encrypt
 import { createCipheriv, createHash, randomBytes } from "node:crypto";
 import { neon } from "@neondatabase/serverless";
+import { databaseUrl } from "../lib/databaseUrl.mjs";
 
-const url = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
+let url;
+try {
+  url = databaseUrl();
+} catch {
+  url = undefined;
+}
 const raw = process.env.SETTINGS_ENCRYPTION_KEY?.trim();
 if (!url || !raw) {
   console.error("DATABASE_URL (ou POSTGRES_URL) et SETTINGS_ENCRYPTION_KEY sont obligatoires.");
