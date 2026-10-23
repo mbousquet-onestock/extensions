@@ -4,7 +4,7 @@ App Next.js (déployée sur Vercel) chargée en iframe dans OneStock comme UI ex
 
 - **Contexte** : récupère les paramètres d'URL envoyés par OneStock (`site_id`, `extension_id`, `user_id`, `lang`, `host_app`, `parent_url`, …), fait le handshake `extension_ready` → `onestock_data` par postMessage (la signature `extension_signature` n'est pas contrôlée). Le contexte est affiché en haut de chaque page et conservé dans les liens. Hors OneStock, on peut saisir un `site_id` à la main.
 - **Racine de l'API OneStock** (`{onestock_api_root}` ci-dessous) : toujours le `parent_url` du contexte (ex. `https://admin.eu1.qualif.onestock-retail.com`). Le token y étant envoyé, seule une URL `https` d'un hôte OneStock est acceptée (`*.onestock-retail.com`, réglable avec `ONESTOCK_ALLOWED_HOSTS`) ; hors OneStock (sans contexte), le setting `onestock_api_root` sert de repli. L'environnement des settings (`qualif`…) est déduit du même `parent_url`.
-- **Token OneStock : un par `parent_url`**. Il se saisit dans **Settings généraux** (encadré « Token OneStock », ouvert depuis OneStock) et est stocké chiffré dans `settings` : `key = onestock_token`, `site_id` vide, `extension_id = *`, `environment` = origine du `parent_url` (ex. `https://admin.eu1.qualif.onestock-retail.com`). Tant qu'il n'est pas saisi, le token de l'environnement (`qualif`, `prod`…) sert de repli et la page Extensions le signale.
+- **Token OneStock : un par `parent_url`**. Il se saisit dans **Settings généraux** (encadré « Token OneStock », ouvert depuis OneStock) et est stocké chiffré dans `settings` : `key = onestock_token`, `site_id` vide, `extension_id = *`, `environment` = origine du `parent_url` (ex. `https://admin.eu1.qualif.onestock-retail.com`). Depuis OneStock, **seul le token de ce `parent_url` est utilisé** (aucun repli sur un autre token) : tant qu'il n'est pas saisi, aucun appel n'est fait et la page Extensions le signale. Hors OneStock (sans `parent_url`), le token de l'environnement (`qualif`, `prod`…) est utilisé.
 - **Extensions** (`/`) : les extensions installées sur le `site_id` du contexte viennent de l'API OneStock — `POST {onestock_api_root}/extensions/query` puis `GET {onestock_api_root}/extensions/{id}` (corps `{ site_id, token }`, token = setting global `onestock_token`) : icône, points d'injection, URL de production / test, dernière mise à jour. Elles sont rapprochées du catalogue commun en base **par le nom** (l'id OneStock est généré à la création sur chaque environnement) ; un badge signale les champs qui diffèrent (url, test_url, icon, injection_points). La modale de modification affiche toutes les données de l'API (id, dates, URL, icônes, points d'injection, JSON complet) à côté du formulaire du catalogue ; une extension installée hors catalogue peut y être ajoutée en un clic, formulaire prérempli. La création reprend les champs de l'API : nom, icône (base64, 100 Ko max), url, test_url et points d'injection (anchor, name, slug, path, icône). Chaque appel est enregistré dans `api_logs` (token masqué, icônes base64 remplacées par un libellé).
 
   Actions sur chaque ligne (avec confirmation pour l'environnement) :
@@ -78,7 +78,7 @@ Les valeurs sensibles sont stockées chiffrées (`enc:v1:…`). Une autre applic
 
 API REST pour lire et modifier la table `settings` depuis d'autres applications. Authentification par clé : `Authorization: Bearer <clé>` (ou en-tête `x-api-key`), clés définies dans `SETTINGS_API_KEYS`. Chaque appel est journalisé dans `api_logs` (API « Settings API », valeurs sensibles masquées).
 
-Un setting est identifié par `key` + `site_id` (vide = global) + `extension_id` + `environment`. Les clés sensibles (`onestock_token`…) sont chiffrées automatiquement à l'écriture ; à la lecture leur `value` vaut `null` sauf avec `?decrypt=1`. En lecture, `?parent_url=<parent_url du contexte>` fait renvoyer pour `onestock_api_root` l'origine de ce `parent_url`, et pour `onestock_token` le token propre à ce `parent_url` s'il existe (champ `from_context: true`).
+Un setting est identifié par `key` + `site_id` (vide = global) + `extension_id` + `environment`. Les clés sensibles (`onestock_token`…) sont chiffrées automatiquement à l'écriture ; à la lecture leur `value` vaut `null` sauf avec `?decrypt=1`. En lecture, `?parent_url=<parent_url du contexte>` fait renvoyer pour `onestock_api_root` l'origine de ce `parent_url`, et pour `onestock_token` **uniquement** le token de ce `parent_url` (champ `from_context: true` ; 404 s'il n'est pas saisi ; dans la liste, les tokens des autres `parent_url` sont écartés). Avec `parent_url`, `site_id` / `extension_id` / `environment` sont inutiles pour lire `onestock_token`.
 
 | Méthode | URL | Rôle |
 | --- | --- | --- |
@@ -87,6 +87,8 @@ Un setting est identifié par `key` + `site_id` (vide = global) + `extension_id`
 | `GET` | `/api/settings/item?key=…&site_id=…&extension_id=…&environment=…` | Lit un setting — 404 s'il n'existe pas |
 | `PUT` | `/api/settings/item?key=…&site_id=…&extension_id=…&environment=…` | Met à jour `{ value?, scope? }` — 404 s'il n'existe pas, sauf `&upsert=1` (création) |
 | `DELETE` | `/api/settings/item?key=…&site_id=…&extension_id=…&environment=…` | Supprime un setting |
+| `GET` | `/api/settings/token?parent_url=…&decrypt=1` | Token OneStock de ce `parent_url` : `{ parent_url, api_root, token, encrypted, updated_at }` (`token` null sans `decrypt=1`) — 404 s'il n'est pas saisi, 400 si le `parent_url` n'est pas un hôte OneStock autorisé |
+| `PUT` | `/api/settings/token?parent_url=…` | Enregistre (chiffré) le token de ce `parent_url` : `{ "token": "…" }` |
 
 ```bash
 API=https://<app>.vercel.app/api/settings
@@ -99,7 +101,10 @@ curl -H "$AUTH" "$API?site_id=o0057&extension_id=*&environment=qualif"
 curl -H "$AUTH" -H 'content-type: application/json' -X POST "$API" \
   -d '{"key":"default_lang","value":"fr","site_id":"o0057","extension_id":"*","environment":"qualif"}'
 
-# Lire onestock_token déchiffré
+# Token OneStock du parent_url du contexte (déchiffré)
+curl -H "$AUTH" "$API/token?parent_url=https%3A%2F%2Fadmin.eu1.qualif.onestock-retail.com&decrypt=1"
+
+# Lire onestock_token déchiffré (par environnement, hors contexte)
 curl -H "$AUTH" "$API/item?key=onestock_token&site_id=&extension_id=*&environment=qualif&decrypt=1"
 
 # Mettre à jour (ou créer avec upsert=1)

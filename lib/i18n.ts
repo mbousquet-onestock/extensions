@@ -200,7 +200,7 @@ const fr = {
   "ext.done.uninstalled": "« {name} » désinstallée de l'environnement.",
   "ext.done.cataloged": "« {name} » ajoutée au catalogue.",
   "ext.done.deleted": "« {name} » supprimée du catalogue.",
-  "ext.actionError.no_credentials": "Action impossible : onestock_api_root ou onestock_token manquant pour le site {site}.",
+  "ext.actionError.no_credentials": "Action impossible : aucun token OneStock pour ce parent_url (Settings généraux), ou onestock_api_root manquant hors OneStock, site {site}.",
   "ext.actionError.not_in_catalog": "Action impossible : l'extension n'est plus au catalogue.",
   "ext.actionError.not_found": "Action impossible : extension introuvable sur l'environnement.",
   "ext.actionError.duplicate_name": "Une extension du catalogue porte déjà ce nom.",
@@ -267,7 +267,7 @@ const fr = {
   "token.error.parent_url": "Page ouverte hors OneStock : aucun parent_url valide.",
   "token.error.empty": "Saisissez un token.",
   "token.error.no_encryption_key": "Chiffrement impossible : la variable SETTINGS_ENCRYPTION_KEY n'est pas définie.",
-  "token.fallback": "Aucun token propre à {origin} : le token de l'environnement est utilisé.",
+  "token.required": "Aucun token OneStock pour {origin} : chaque parent_url utilise son propre token.",
   "token.setIt": "Saisir le token de ce parent_url",
 } as const;
 
@@ -473,7 +473,7 @@ const en: Record<MessageKey, string> = {
   "ext.done.uninstalled": "\"{name}\" uninstalled from the environment.",
   "ext.done.cataloged": "\"{name}\" added to the catalog.",
   "ext.done.deleted": "\"{name}\" removed from the catalog.",
-  "ext.actionError.no_credentials": "Action not possible: onestock_api_root or onestock_token missing for site {site}.",
+  "ext.actionError.no_credentials": "Action not possible: no OneStock token for this parent_url (General settings), or onestock_api_root missing outside OneStock, site {site}.",
   "ext.actionError.not_in_catalog": "Action not possible: the extension is no longer in the catalog.",
   "ext.actionError.not_found": "Action not possible: extension not found on the environment.",
   "ext.actionError.duplicate_name": "A catalog extension already has this name.",
@@ -540,7 +540,7 @@ const en: Record<MessageKey, string> = {
   "token.error.parent_url": "Page opened outside OneStock: no valid parent_url.",
   "token.error.empty": "Enter a token.",
   "token.error.no_encryption_key": "Cannot encrypt: the SETTINGS_ENCRYPTION_KEY variable is not set.",
-  "token.fallback": "No token specific to {origin}: the environment token is used.",
+  "token.required": "No OneStock token for {origin}: each parent_url uses its own token.",
   "token.setIt": "Enter this parent_url's token",
 };
 

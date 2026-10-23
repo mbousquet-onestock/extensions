@@ -115,6 +115,15 @@ export const wantsDecrypt = (url: URL) => ["1", "true"].includes(url.searchParam
  * `onestock_api_root` suit le contexte OneStock : si l'appel fournit `?parent_url=` (hôte OneStock autorisé),
  * la valeur renvoyée pour ce setting est cette URL (origine), à la place de la valeur stockée.
  */
+/**
+ * Avec ?parent_url=, onestock_token est celui de ce parent_url uniquement :
+ * les lignes onestock_token d'un autre environnement sont écartées.
+ */
+export function onlyParentToken<T extends { key: string; environment: string }>(url: URL, settings: T[]): T[] {
+  const origin = contextApiRoot(url.searchParams.get("parent_url"));
+  return origin ? settings.filter((s) => s.key !== "onestock_token" || s.environment === origin) : settings;
+}
+
 export function withContextApiRoot<T extends { key: string; value: string | null }>(url: URL, setting: T): T {
   const root = contextApiRoot(url.searchParams.get("parent_url"));
   return root && setting.key === "onestock_api_root" ? { ...setting, value: root, from_context: true } : setting;

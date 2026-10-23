@@ -1,7 +1,7 @@
 import { contextApiRoot } from "@/lib/onestock";
 import { HttpError, settingIdFrom, settingsRoute, valueFrom, wantsDecrypt, withContextApiRoot } from "@/lib/settingsApi";
 import { invalidateFromRoute, SETTINGS_TAG } from "@/lib/cache";
-import { createSetting, deleteSetting, readSetting, updateSetting } from "@/lib/settings";
+import { createSetting, deleteSetting, parentTokenId, readSetting, updateSetting } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -11,16 +11,15 @@ export const dynamic = "force-dynamic";
 /** GET /api/settings/item — lit un setting (valeur sensible déchiffrée avec ?decrypt=1). */
 export const GET = settingsRoute(async (req) => {
   const url = new URL(req.url);
-  const id = settingIdFrom(url);
-  // onestock_token : un token par parent_url (ligne dont environment = origine du parent_url), s'il existe.
+  // onestock_token + ?parent_url= : uniquement le token de ce parent_url (404 s'il n'est pas saisi) ;
+  // site_id / extension_id / environment sont alors inutiles.
   const origin = contextApiRoot(url.searchParams.get("parent_url"));
-  if (origin && id.key === "onestock_token") {
-    const perParent = await readSetting(
-      { key: "onestock_token", site_id: "", extension_id: "*", environment: origin },
-      { decrypt: wantsDecrypt(url) },
-    );
-    if (perParent) return { body: { setting: { ...perParent, from_context: true } } };
+  if (origin && url.searchParams.get("key") === "onestock_token") {
+    const perParent = await readSetting(parentTokenId(origin), { decrypt: wantsDecrypt(url) });
+    if (!perParent) throw new HttpError(404, "not_found: no onestock_token for this parent_url");
+    return { body: { setting: { ...perParent, from_context: true } } };
   }
+  const id = settingIdFrom(url);
   const setting = await readSetting(id, { decrypt: wantsDecrypt(url) });
   if (!setting) {
     // onestock_api_root : sans ligne en base, la racine vient du contexte (?parent_url=) si fournie.

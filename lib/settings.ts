@@ -225,7 +225,7 @@ export async function deleteSetting(id: SettingId) {
 // ---------- Token OneStock par parent_url ----------
 
 /** Ligne du token d'un parent_url : key onestock_token, site global, extension *, environment = origine. */
-const parentTokenId = (origin: string): SettingId => ({ key: "onestock_token", site_id: "", extension_id: "*", environment: origin });
+export const parentTokenId = (origin: string): SettingId => ({ key: "onestock_token", site_id: "", extension_id: "*", environment: origin });
 
 /** État du token d'un parent_url (jamais sa valeur). */
 export async function parentTokenStatus(origin: string) {

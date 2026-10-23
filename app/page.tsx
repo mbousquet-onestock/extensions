@@ -8,7 +8,7 @@ import ApiExtensionDetails from "@/components/ApiExtensionDetails";
 import ExtensionForm, { type ExtensionFormValues } from "@/components/ExtensionForm";
 import { nameKey, readCatalog, type Extension } from "@/lib/db";
 import { formatDate, getT, type MessageKey } from "@/lib/i18n";
-import { getCredentials, getInstalledExtensions, iconSrc, type OneStockExtension } from "@/lib/onestock";
+import { contextApiRoot, getCredentials, getInstalledExtensions, iconSrc, type OneStockExtension } from "@/lib/onestock";
 import { summarizeError } from "@/lib/payload";
 import {
   addToCatalog,
@@ -84,15 +84,16 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
   let apiProblem: string | null = null;
   let environment: string | null = null;
   let apiRoot: string | null = null;
-  let tokenFallback = false;
+  let tokenMissing: string | null = null;
   if (siteId && !error) {
     try {
       const creds = await getCredentials(siteId, params.parent_url);
-      if (!creds) apiProblem = t("ext.noCredentials", { site: siteId });
+      const origin = contextApiRoot(params.parent_url);
+      if (!creds && origin) tokenMissing = origin;
+      else if (!creds) apiProblem = t("ext.noCredentials", { site: siteId });
       else {
         environment = creds.environment;
         apiRoot = creds.apiRoot;
-        tokenFallback = creds.apiRootSource === "context" && creds.tokenSource === "environment";
         installed = await getInstalledExtensions(creds, siteId);
       }
     } catch (e) {
@@ -196,9 +197,9 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
       {error && <Alert type="danger">{t("common.dbError", { error })}</Alert>}
       {!siteId && <Alert type="info">{t("ext.noSite")}</Alert>}
       {apiProblem && <Alert type="danger">{apiProblem}</Alert>}
-      {tokenFallback && apiRoot && (
-        <Alert type="info">
-          {t("token.fallback", { origin: apiRoot })}{" "}
+      {tokenMissing && (
+        <Alert type="danger">
+          {t("token.required", { origin: tokenMissing })}{" "}
           <Link href={withContext("/settings", params) + "#parent-token"}>{t("token.setIt")}</Link>
         </Alert>
       )}

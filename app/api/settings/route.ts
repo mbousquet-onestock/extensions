@@ -1,4 +1,4 @@
-import { HttpError, settingIdFrom, settingsRoute, valueFrom, wantsDecrypt, withContextApiRoot } from "@/lib/settingsApi";
+import { HttpError, onlyParentToken, settingIdFrom, settingsRoute, valueFrom, wantsDecrypt, withContextApiRoot } from "@/lib/settingsApi";
 import { invalidateFromRoute, SETTINGS_TAG } from "@/lib/cache";
 import { createSetting, listSettings, type SettingFilters } from "@/lib/settings";
 
@@ -9,6 +9,7 @@ const FILTERS = ["key", "site_id", "extension_id", "environment", "scope"] as co
 /**
  * GET /api/settings — liste filtrable : ?key=&site_id=&extension_id=&environment=&scope=&limit=
  * (site_id= vide → settings globaux). Les valeurs sensibles valent null sauf avec ?decrypt=1.
+ * Avec ?parent_url=, onestock_token est uniquement celui de ce parent_url.
  */
 export const GET = settingsRoute(async (req) => {
   const url = new URL(req.url);
@@ -21,7 +22,7 @@ export const GET = settingsRoute(async (req) => {
     decrypt: wantsDecrypt(url),
     limit: Number(url.searchParams.get("limit")) || 1000,
   });
-  const withRoot = settings.map((s) => withContextApiRoot(url, s));
+  const withRoot = onlyParentToken(url, settings).map((s) => withContextApiRoot(url, s));
   return { body: { settings: withRoot, count: withRoot.length } };
 });
 

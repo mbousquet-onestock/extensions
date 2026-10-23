@@ -86,10 +86,10 @@ export async function getCredentials(siteId: string, parentUrl?: string | null):
   };
   const fromContext = contextApiRoot(parentUrl);
   const apiRoot = fromContext ?? pickIn("onestock_api_root", environment);
-  // Un token par parent_url : ligne onestock_token dont environment = origine du parent_url ;
-  // à défaut (pas encore saisi), le token de l'environnement. Stocké chiffré, déchiffré ici seulement.
-  const contextToken = fromContext ? pickIn("onestock_token", fromContext) : undefined;
-  const stored = contextToken ?? pickIn("onestock_token", environment);
+  // Un token par parent_url : depuis OneStock, uniquement la ligne onestock_token dont
+  // environment = origine du parent_url (aucun repli sur un autre token). Hors OneStock
+  // (sans parent_url), le token de l'environnement. Stocké chiffré, déchiffré ici seulement.
+  const stored = fromContext ? pickIn("onestock_token", fromContext) : pickIn("onestock_token", environment);
   const token = stored ? decryptSecret(stored) : undefined;
   return apiRoot && token
     ? {
@@ -97,7 +97,7 @@ export async function getCredentials(siteId: string, parentUrl?: string | null):
         token,
         environment,
         apiRootSource: fromContext ? "context" : "setting",
-        tokenSource: contextToken ? "parent_url" : "environment",
+        tokenSource: fromContext ? "parent_url" : "environment",
       }
     : null;
 }
