@@ -16,7 +16,7 @@ function originFrom(url: URL) {
 }
 
 /**
- * GET /api/settings/token?parent_url=…[&decrypt=1] — token de ce parent_url
+ * GET /api/settings/token?parent_url=…[&api_url=…][&decrypt=1] — token de ce parent_url
  * (`token` vaut null sans ?decrypt=1). 404 s'il n'a pas été saisi : aucun repli sur un autre token.
  */
 export const GET = settingsRoute(async (req) => {
@@ -27,7 +27,7 @@ export const GET = settingsRoute(async (req) => {
   return {
     body: {
       parent_url: origin,
-      api_root: await apiRootFor(origin, url.searchParams.get("site_id") ?? ""),
+      api_root: await apiRootFor(origin, url.searchParams.get("site_id") ?? "", url.searchParams.get("api_url")),
       key: "onestock_token",
       token: wantsDecrypt(url) ? setting.value : null,
       encrypted: setting.encrypted,

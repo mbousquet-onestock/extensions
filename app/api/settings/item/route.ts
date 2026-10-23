@@ -21,7 +21,7 @@ export const GET = settingsRoute(async (req) => {
   }
   // onestock_api_root + ?parent_url= : URL de l'API utilisée pour ce parent_url (la sienne, sinon celle de l'environnement).
   if (origin && url.searchParams.get("key") === "onestock_api_root") {
-    const value = await apiRootFor(origin, url.searchParams.get("site_id") ?? "");
+    const value = await apiRootFor(origin, url.searchParams.get("site_id") ?? "", url.searchParams.get("api_url"));
     if (!value) throw new HttpError(404, "not_found: no onestock_api_root for this parent_url");
     return { body: { setting: { key: "onestock_api_root", value, parent_url: origin, from_context: true } } };
   }

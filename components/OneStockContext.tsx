@@ -59,13 +59,14 @@ export default function OneStockContext() {
       const data = (event.data.data ?? {}) as Shared;
       setShared(data);
 
-      // Complète l'URL si le site n'y figurait pas mais est fourni par le handshake.
+      // Complète l'URL avec ce que fournit le handshake : le site s'il manquait et l'URL de l'API
+      // (api_url, utilisée côté serveur pour les appels OneStock).
+      const next = new URLSearchParams(params);
       const site = data.site_id ?? data.siteId;
-      if (!params.get("site_id") && typeof site === "string" && site) {
-        const next = new URLSearchParams(params);
-        next.set("site_id", site);
-        router.replace(`${pathname}?${next}`);
-      }
+      if (!params.get("site_id") && typeof site === "string" && site) next.set("site_id", site);
+      const apiUrl = data.api_url ?? data.apiUrl;
+      if (typeof apiUrl === "string" && apiUrl && params.get("api_url") !== apiUrl) next.set("api_url", apiUrl);
+      if (next.toString() !== params.toString()) router.replace(`${pathname}?${next}`);
     };
 
     window.addEventListener("message", onMessage);

@@ -92,7 +92,7 @@ export async function deleteExtension(form: FormData) {
 async function credentialsFor(form: FormData) {
   const siteId = text(form, "site_id");
   if (!siteId) return null;
-  const creds = await getCredentials(siteId, text(form, "parent_url") || null);
+  const creds = await getCredentials(siteId, text(form, "parent_url") || null, text(form, "api_url") || null);
   return creds ? { creds, siteId } : null;
 }
 

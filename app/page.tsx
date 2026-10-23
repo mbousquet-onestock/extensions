@@ -8,7 +8,7 @@ import ApiExtensionDetails from "@/components/ApiExtensionDetails";
 import ExtensionForm, { type ExtensionFormValues } from "@/components/ExtensionForm";
 import { nameKey, readCatalog, type Extension } from "@/lib/db";
 import { formatDate, getT, type MessageKey } from "@/lib/i18n";
-import { parentOrigin, getCredentials, getInstalledExtensions, iconSrc, type OneStockExtension } from "@/lib/onestock";
+import { OneStockError, parentOrigin, getCredentials, getInstalledExtensions, iconSrc, type OneStockExtension } from "@/lib/onestock";
 import { summarizeError } from "@/lib/payload";
 import {
   addToCatalog,
@@ -59,6 +59,7 @@ function ActionFields({ params, back, name }: { params: Search; back: string; na
       <input type="hidden" name="name" value={name} />
       <input type="hidden" name="site_id" value={params.site_id ?? ""} />
       <input type="hidden" name="parent_url" value={params.parent_url ?? ""} />
+      <input type="hidden" name="api_url" value={params.api_url ?? ""} />
     </>
   );
 }
@@ -85,16 +86,23 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
   let environment: string | null = null;
   let apiRoot: string | null = null;
   let tokenMissing: string | null = null;
+  let authFailed: { origin: string; api: string } | null = null;
   if (siteId && !error) {
     try {
-      const creds = await getCredentials(siteId, params.parent_url);
+      const creds = await getCredentials(siteId, params.parent_url, params.api_url);
       const origin = parentOrigin(params.parent_url);
       if (!creds && origin) tokenMissing = origin;
       else if (!creds) apiProblem = t("ext.noCredentials", { site: siteId });
       else {
         environment = creds.environment;
         apiRoot = creds.apiRoot;
-        installed = await getInstalledExtensions(creds, siteId);
+        try {
+          installed = await getInstalledExtensions(creds, siteId);
+        } catch (e) {
+          // Token refusé : indiquer quel token (celui du parent_url) et quelle API ont été utilisés.
+          if ((e as OneStockError).status === 401 && creds.parentOrigin) authFailed = { origin: creds.parentOrigin, api: creds.apiRoot };
+          throw e;
+        }
       }
     } catch (e) {
       apiProblem = t("ext.apiError", { error: summarizeError((e as Error).message) });
@@ -196,7 +204,18 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
       {params.saved && <Alert type="success">{t("ext.saved")}</Alert>}
       {error && <Alert type="danger">{t("common.dbError", { error })}</Alert>}
       {!siteId && <Alert type="info">{t("ext.noSite")}</Alert>}
-      {apiProblem && <Alert type="danger">{apiProblem}</Alert>}
+      {apiProblem && (
+        <Alert type="danger">
+          {apiProblem}
+          {authFailed && (
+            <>
+              {" "}
+              {t("token.rejected", authFailed)}{" "}
+              <Link href={withContext("/settings", params) + "#parent-token"}>{t("token.setIt")}</Link>
+            </>
+          )}
+        </Alert>
+      )}
       {tokenMissing && (
         <Alert type="danger">
           {t("token.required", { origin: tokenMissing })}{" "}

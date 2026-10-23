@@ -12,7 +12,7 @@ export default async function ParentTokenCard({ params }: { params: Record<strin
   if (!origin) return null; // hors OneStock : pas de parent_url, rien à configurer ici
   const [status, usedRoot] = await Promise.all([
     parentTokenStatus(origin).catch(() => ({ exists: false as const, apiRoot: null })),
-    apiRootFor(params.parent_url, params.site_id ?? "").catch(() => null),
+    apiRootFor(params.parent_url, params.site_id ?? "", params.api_url).catch(() => null),
   ]);
   const errorKey = params.token_error;
   const known = ["parent_url", "empty", "no_encryption_key", "api_root"];

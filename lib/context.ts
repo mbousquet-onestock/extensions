@@ -9,6 +9,8 @@ export const CONTEXT_KEYS = [
   "parent_url",
   "host_app",
   "injection_point_path",
+  // URL de l'API OneStock fournie par onestock_data (ajoutée à l'URL après le handshake).
+  "api_url",
 ] as const;
 
 type Params = Record<string, string | string[] | undefined>;

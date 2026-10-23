@@ -14,6 +14,8 @@ export type Credentials = {
   environment: string;
   /** Origine du parent_url du contexte (identifie l'environnement OneStock), null hors OneStock. */
   parentOrigin: string | null;
+  /** D'où vient l'URL de l'API : api_url de onestock_data, setting du parent_url ou de l'environnement. */
+  apiRootSource: "api_url" | "parent_url" | "environment";
 };
 
 /**
@@ -68,11 +70,13 @@ const isOriginEnv = (env: string) => /^https?:\/\//i.test(env);
  * Résout, pour un site et un parent_url, l'environnement des settings et les valeurs stockées :
  * - token : depuis OneStock, uniquement celui du parent_url (ligne onestock_token dont
  *   environment = origine du parent_url, aucun repli) ; hors OneStock, celui de l'environnement ;
- * - URL de l'API : celle du parent_url si saisie, sinon onestock_api_root de l'environnement
+ * - URL de l'API : `api_url` envoyée par OneStock dans onestock_data (ex. https://p0039.api.qualif.onestock-retail.com),
+ *   sinon celle saisie pour le parent_url, sinon onestock_api_root de l'environnement
  *   (ONESTOCK_ENVIRONMENT, sinon « qualif » si le parent_url le contient, sinon le seul, sinon prod).
  */
-function resolveCredentials(rows: CredentialRow[], siteId: string, parentUrl?: string | null) {
+function resolveCredentials(rows: CredentialRow[], siteId: string, parentUrl?: string | null, apiUrl?: string | null) {
   const origin = parentOrigin(parentUrl);
+  const fromContext = parentOrigin(apiUrl); // hôte OneStock https uniquement : le token y est envoyé
   const envs = [...new Set(rows.map((r) => r.environment).filter((e) => !isOriginEnv(e)))];
   const wanted = process.env.ONESTOCK_ENVIRONMENT || (parentUrl && /qualif/i.test(parentUrl) ? "qualif" : undefined);
   const environment =
@@ -83,26 +87,32 @@ function resolveCredentials(rows: CredentialRow[], siteId: string, parentUrl?: s
     const candidates = rows.filter((r) => r.key === key && r.environment === env);
     return (candidates.find((r) => r.site_id === siteId) ?? candidates[0])?.value;
   };
+  const fromParent = origin ? pickIn("onestock_api_root", origin) : undefined;
   return {
     origin,
     environment,
-    apiRoot: (origin && pickIn("onestock_api_root", origin)) || pickIn("onestock_api_root", environment),
+    apiRoot: fromContext || fromParent || pickIn("onestock_api_root", environment),
+    apiRootSource: (fromContext ? "api_url" : fromParent ? "parent_url" : "environment") as Credentials["apiRootSource"],
     storedToken: origin ? pickIn("onestock_token", origin) : pickIn("onestock_token", environment),
   };
 }
 
 /** URL de l'API OneStock utilisée pour ce parent_url (et ce site), sans le token. */
-export async function apiRootFor(parentUrl: string | null | undefined, siteId = "") {
-  return resolveCredentials(await credentialRows(siteId), siteId, parentUrl).apiRoot ?? null;
+export async function apiRootFor(parentUrl: string | null | undefined, siteId = "", apiUrl?: string | null) {
+  return resolveCredentials(await credentialRows(siteId), siteId, parentUrl, apiUrl).apiRoot ?? null;
 }
 
 /** Identifiants OneStock du site pour le parent_url du contexte (token déchiffré ici seulement). */
-export async function getCredentials(siteId: string, parentUrl?: string | null): Promise<Credentials | null> {
+export async function getCredentials(
+  siteId: string,
+  parentUrl?: string | null,
+  apiUrl?: string | null,
+): Promise<Credentials | null> {
   const rows = await credentialRows(siteId);
   if (rows.length === 0) return null;
-  const { origin, environment, apiRoot, storedToken } = resolveCredentials(rows, siteId, parentUrl);
+  const { origin, environment, apiRoot, apiRootSource, storedToken } = resolveCredentials(rows, siteId, parentUrl, apiUrl);
   const token = storedToken ? decryptSecret(storedToken) : undefined;
-  return apiRoot && token ? { apiRoot, token, environment, parentOrigin: origin } : null;
+  return apiRoot && token ? { apiRoot, token, environment, parentOrigin: origin, apiRootSource } : null;
 }
 
 /** {{url}} = onestock_api_root (une version, ex. `v3`, peut être ajoutée via ONESTOCK_API_VERSION). */
@@ -251,7 +261,7 @@ export async function getInstalledExtensions(creds: Credentials, siteId: string)
         if (result.some((e) => e.name === e.id)) throw new Incomplete(result);
         return result;
       },
-      ["onestock-installed", creds.apiRoot, creds.environment, siteId],
+      ["onestock-installed", creds.apiRoot, creds.parentOrigin ?? creds.environment, siteId],
       { tags: [onestockTag(siteId)], revalidate: 60 },
     )();
   } catch (e) {

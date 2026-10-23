@@ -34,7 +34,7 @@ export default async function ExtensionSettingsPage({
     }
     // Détail OneStock (nom, points d'injection) si le site et ses identifiants API sont connus.
     if (siteId) {
-      const creds = await getCredentials(siteId, search.parent_url).catch(() => null);
+      const creds = await getCredentials(siteId, search.parent_url, search.api_url).catch(() => null);
       if (creds) os = await getExtension(creds, siteId, id).catch(() => null);
     }
     if (os) {
