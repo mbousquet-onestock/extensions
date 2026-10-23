@@ -84,6 +84,7 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
   let apiProblem: string | null = null;
   let environment: string | null = null;
   let apiRoot: string | null = null;
+  let tokenFallback = false;
   if (siteId && !error) {
     try {
       const creds = await getCredentials(siteId, params.parent_url);
@@ -91,6 +92,7 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
       else {
         environment = creds.environment;
         apiRoot = creds.apiRoot;
+        tokenFallback = creds.apiRootSource === "context" && creds.tokenSource === "environment";
         installed = await getInstalledExtensions(creds, siteId);
       }
     } catch (e) {
@@ -194,6 +196,12 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
       {error && <Alert type="danger">{t("common.dbError", { error })}</Alert>}
       {!siteId && <Alert type="info">{t("ext.noSite")}</Alert>}
       {apiProblem && <Alert type="danger">{apiProblem}</Alert>}
+      {tokenFallback && apiRoot && (
+        <Alert type="info">
+          {t("token.fallback", { origin: apiRoot })}{" "}
+          <Link href={withContext("/settings", params) + "#parent-token"}>{t("token.setIt")}</Link>
+        </Alert>
+      )}
       {params.done && DONE_KEYS.includes(params.done as never) && (
         <Alert type="success">
           {t(`ext.done.${params.done}` as MessageKey, { name: params.name ?? "" })}

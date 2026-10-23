@@ -1,3 +1,4 @@
+import ParentTokenCard from "@/components/ParentTokenCard";
 import SettingsView from "@/components/SettingsView";
 import { Alert } from "@/components/ui";
 import { getT } from "@/lib/i18n";
@@ -33,6 +34,7 @@ export default async function GeneralSettingsPage({
           </p>
         </div>
       </div>
+      <ParentTokenCard params={search} />
       {error ? (
         <Alert type="danger">{t("common.dbError", { error })}</Alert>
       ) : (

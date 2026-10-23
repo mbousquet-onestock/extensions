@@ -221,3 +221,21 @@ export async function deleteSetting(id: SettingId) {
   const rows = await getSql().query(`DELETE FROM settings WHERE ${ID_WHERE} RETURNING 1`, idArgs(id));
   return rows.length > 0;
 }
+
+// ---------- Token OneStock par parent_url ----------
+
+/** Ligne du token d'un parent_url : key onestock_token, site global, extension *, environment = origine. */
+const parentTokenId = (origin: string): SettingId => ({ key: "onestock_token", site_id: "", extension_id: "*", environment: origin });
+
+/** État du token d'un parent_url (jamais sa valeur). */
+export async function parentTokenStatus(origin: string) {
+  const s = await readSetting(parentTokenId(origin));
+  return s ? { exists: true, encrypted: s.encrypted, updated_at: s.updated_at } : { exists: false as const };
+}
+
+/** Enregistre (chiffré) le token d'un parent_url : met à jour la ligne existante ou la crée. */
+export async function saveParentToken(origin: string, token: string) {
+  const id = parentTokenId(origin);
+  const updated = await updateSetting(id, { value: token });
+  if (!updated) await createSetting({ ...id, value: token, scope: "global" });
+}

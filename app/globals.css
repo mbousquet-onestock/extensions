@@ -335,3 +335,8 @@ pre.code { margin: 6px 0 0; padding: 8px; background: var(--neutral-30); border-
 .table .num { text-align: right; }
 .copy-confirm { padding: var(--spacing-xl); border-top: 1px solid var(--border-primary); display: flex; flex-direction: column; gap: var(--spacing-l); }
 .copy-confirm .field { max-width: 320px; }
+
+/* ---------- Token OneStock par parent_url ---------- */
+.token-row { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-l); flex-wrap: wrap; }
+.token-form { display: flex; gap: var(--spacing-m); flex: 1; justify-content: flex-end; min-width: 280px; }
+.token-form .input { flex: 1; max-width: 420px; }

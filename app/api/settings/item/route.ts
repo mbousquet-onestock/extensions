@@ -11,7 +11,17 @@ export const dynamic = "force-dynamic";
 /** GET /api/settings/item — lit un setting (valeur sensible déchiffrée avec ?decrypt=1). */
 export const GET = settingsRoute(async (req) => {
   const url = new URL(req.url);
-  const setting = await readSetting(settingIdFrom(url), { decrypt: wantsDecrypt(url) });
+  const id = settingIdFrom(url);
+  // onestock_token : un token par parent_url (ligne dont environment = origine du parent_url), s'il existe.
+  const origin = contextApiRoot(url.searchParams.get("parent_url"));
+  if (origin && id.key === "onestock_token") {
+    const perParent = await readSetting(
+      { key: "onestock_token", site_id: "", extension_id: "*", environment: origin },
+      { decrypt: wantsDecrypt(url) },
+    );
+    if (perParent) return { body: { setting: { ...perParent, from_context: true } } };
+  }
+  const setting = await readSetting(id, { decrypt: wantsDecrypt(url) });
   if (!setting) {
     // onestock_api_root : sans ligne en base, la racine vient du contexte (?parent_url=) si fournie.
     const root = settingIdFrom(url).key === "onestock_api_root" ? contextApiRoot(url.searchParams.get("parent_url")) : null;

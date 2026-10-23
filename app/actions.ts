@@ -5,6 +5,7 @@ import { invalidateNow, onestockTag, SETTINGS_TAG } from "@/lib/cache";
 import { redirect } from "next/navigation";
 import { clearLogs } from "@/lib/apiLogs";
 import {
+  contextApiRoot,
   createExtension,
   missingForInstall,
   deleteRemoteExtension,
@@ -13,7 +14,7 @@ import {
   type OneStockExtension,
 } from "@/lib/onestock";
 import { summarizeError } from "@/lib/payload";
-import { copyGlobalSettingsToSite } from "@/lib/settings";
+import { copyGlobalSettingsToSite, saveParentToken } from "@/lib/settings";
 import { randomUUID } from "node:crypto";
 import { encryptSecret, isSecretKey, MissingKeyError } from "@/lib/secrets";
 import { ensureSchema, getSql, isWritableColumn, nameKey, readCatalog, type CatalogInjectionPoint } from "@/lib/db";
@@ -196,7 +197,7 @@ export async function clearLogsAction(form: FormData) {
 
 function backWith(back: string, extra: Record<string, string>) {
   const url = new URL(back.startsWith("/") ? back : "/", "http://x");
-  for (const k of ["edit", "new", "edit_key", "edit_site", "edit_ext", "edit_env", "saved", "error", "purged", "cleared", "done", "name", "action_error", "copied", "fields"]) url.searchParams.delete(k);
+  for (const k of ["edit", "new", "edit_key", "edit_site", "edit_ext", "edit_env", "saved", "error", "purged", "cleared", "done", "name", "action_error", "copied", "fields", "token_saved", "token_error"]) url.searchParams.delete(k);
   for (const [k, v] of Object.entries(extra)) url.searchParams.set(k, v);
   return `${url.pathname}${url.search}`;
 }
@@ -276,4 +277,22 @@ export async function refreshFromOneStock(form: FormData) {
   if (siteId) invalidateNow(onestockTag(siteId));
   revalidatePath("/");
   redirect(backWith(text(form, "back"), {}));
+}
+
+/** Enregistre le token OneStock du parent_url du contexte (un token par parent_url, stocké chiffré). */
+export async function saveParentTokenAction(form: FormData) {
+  const back = text(form, "back");
+  const origin = contextApiRoot(text(form, "parent_url"));
+  const token = String(form.get("token") ?? "").trim();
+  if (!origin) redirect(backWith(back, { token_error: "parent_url" }));
+  if (!token) redirect(backWith(back, { token_error: "empty" }));
+  try {
+    await saveParentToken(origin!, token);
+  } catch (e) {
+    redirect(backWith(back, { token_error: e instanceof MissingKeyError ? "no_encryption_key" : (e as Error).message }));
+  }
+  invalidateNow(SETTINGS_TAG);
+  for (const site of [text(form, "site_id")].filter(Boolean)) invalidateNow(onestockTag(site));
+  revalidatePath("/settings");
+  redirect(backWith(back, { token_saved: "1" }));
 }
