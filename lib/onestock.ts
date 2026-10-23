@@ -71,7 +71,8 @@ const isOriginEnv = (env: string) => /^https?:\/\//i.test(env);
  * - token : depuis OneStock, uniquement celui du parent_url (ligne onestock_token dont
  *   environment = origine du parent_url, aucun repli) ; hors OneStock, celui de l'environnement ;
  * - URL de l'API : `api_url` envoyée par OneStock dans onestock_data (ex. https://p0039.api.qualif.onestock-retail.com),
- *   sinon celle saisie pour le parent_url, sinon onestock_api_root de l'environnement
+ *   sinon celle mémorisée pour le parent_url (dernière api_url reçue ou saisie). Depuis OneStock, aucun repli :
+ *   tant qu'elle n'est pas connue, aucun appel. Hors OneStock, onestock_api_root de l'environnement
  *   (ONESTOCK_ENVIRONMENT, sinon « qualif » si le parent_url le contient, sinon le seul, sinon prod).
  */
 function resolveCredentials(rows: CredentialRow[], siteId: string, parentUrl?: string | null, apiUrl?: string | null) {
@@ -91,7 +92,7 @@ function resolveCredentials(rows: CredentialRow[], siteId: string, parentUrl?: s
   return {
     origin,
     environment,
-    apiRoot: fromContext || fromParent || pickIn("onestock_api_root", environment),
+    apiRoot: origin ? fromContext || fromParent : pickIn("onestock_api_root", environment),
     apiRootSource: (fromContext ? "api_url" : fromParent ? "parent_url" : "environment") as Credentials["apiRootSource"],
     storedToken: origin ? pickIn("onestock_token", origin) : pickIn("onestock_token", environment),
   };

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CONTEXT_KEYS } from "@/lib/context";
+import { rememberApiUrlAction } from "@/app/actions";
 import { getT, resolveLang } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 
@@ -65,7 +66,10 @@ export default function OneStockContext() {
       const site = data.site_id ?? data.siteId;
       if (!params.get("site_id") && typeof site === "string" && site) next.set("site_id", site);
       const apiUrl = data.api_url ?? data.apiUrl;
-      if (typeof apiUrl === "string" && apiUrl && params.get("api_url") !== apiUrl) next.set("api_url", apiUrl);
+      if (typeof apiUrl === "string" && apiUrl && params.get("api_url") !== apiUrl) {
+        next.set("api_url", apiUrl);
+        if (parentUrl) void rememberApiUrlAction(parentUrl, apiUrl).catch(() => {});
+      }
       if (next.toString() !== params.toString()) router.replace(`${pathname}?${next}`);
     };
 

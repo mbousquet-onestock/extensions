@@ -237,6 +237,14 @@ export async function parentTokenStatus(origin: string) {
   return s ? { exists: true, encrypted: s.encrypted, updated_at: s.updated_at, apiRoot } : { exists: false as const, apiRoot };
 }
 
+/** Mémorise l'api_url reçue de OneStock pour un parent_url si elle a changé (true si enregistrée). */
+export async function rememberParentApiRoot(origin: string, apiRoot: string) {
+  const current = await readSetting(parentApiRootId(origin));
+  if (current?.value === apiRoot) return false;
+  await saveParentApiRoot(origin, apiRoot);
+  return true;
+}
+
 /** Enregistre l'URL de l'API OneStock d'un parent_url. */
 export async function saveParentApiRoot(origin: string, apiRoot: string) {
   const id = parentApiRootId(origin);

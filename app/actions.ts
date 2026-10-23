@@ -14,7 +14,7 @@ import {
   type OneStockExtension,
 } from "@/lib/onestock";
 import { summarizeError } from "@/lib/payload";
-import { copyGlobalSettingsToSite, saveParentApiRoot, saveParentToken } from "@/lib/settings";
+import { copyGlobalSettingsToSite, rememberParentApiRoot, saveParentApiRoot, saveParentToken } from "@/lib/settings";
 import { randomUUID } from "node:crypto";
 import { encryptSecret, isSecretKey, MissingKeyError } from "@/lib/secrets";
 import { ensureSchema, getSql, isWritableColumn, nameKey, readCatalog, type CatalogInjectionPoint } from "@/lib/db";
@@ -299,4 +299,21 @@ export async function saveParentTokenAction(form: FormData) {
   for (const site of [text(form, "site_id")].filter(Boolean)) invalidateNow(onestockTag(site));
   revalidatePath("/settings");
   redirect(backWith(back, { token_saved: "1" }));
+}
+
+/**
+ * Mémorise l'api_url reçue de OneStock (onestock_data) pour le parent_url, pour que les chargements
+ * suivants appellent directement la bonne API. Hôtes OneStock https uniquement (le token y est envoyé).
+ */
+export async function rememberApiUrlAction(parentUrl: string, apiUrl: string) {
+  const origin = parentOrigin(parentUrl);
+  const root = parentOrigin(apiUrl);
+  if (!origin || !root) return false;
+  try {
+    if (!(await rememberParentApiRoot(origin, root))) return false;
+  } catch {
+    return false;
+  }
+  invalidateNow(SETTINGS_TAG);
+  return true;
 }

@@ -8,6 +8,7 @@ import ApiExtensionDetails from "@/components/ApiExtensionDetails";
 import ExtensionForm, { type ExtensionFormValues } from "@/components/ExtensionForm";
 import { nameKey, readCatalog, type Extension } from "@/lib/db";
 import { formatDate, getT, type MessageKey } from "@/lib/i18n";
+import { parentTokenStatus } from "@/lib/settings";
 import { OneStockError, parentOrigin, getCredentials, getInstalledExtensions, iconSrc, type OneStockExtension } from "@/lib/onestock";
 import { summarizeError } from "@/lib/payload";
 import {
@@ -86,12 +87,17 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
   let environment: string | null = null;
   let apiRoot: string | null = null;
   let tokenMissing: string | null = null;
+  let waitingApiUrl = false;
   let authFailed: { origin: string; api: string } | null = null;
   if (siteId && !error) {
     try {
       const creds = await getCredentials(siteId, params.parent_url, params.api_url);
       const origin = parentOrigin(params.parent_url);
-      if (!creds && origin) tokenMissing = origin;
+      if (!creds && origin) {
+        // Token absent, ou URL de l'API pas encore connue (api_url pas encore reçue de OneStock).
+        if ((await parentTokenStatus(origin)).exists) waitingApiUrl = true;
+        else tokenMissing = origin;
+      }
       else if (!creds) apiProblem = t("ext.noCredentials", { site: siteId });
       else {
         environment = creds.environment;
@@ -216,6 +222,7 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
           )}
         </Alert>
       )}
+      {waitingApiUrl && <Alert type="info">{t("token.waitingApiUrl")}</Alert>}
       {tokenMissing && (
         <Alert type="danger">
           {t("token.required", { origin: tokenMissing })}{" "}
