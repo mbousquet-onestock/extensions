@@ -12,10 +12,8 @@ export type Credentials = {
   apiRoot: string;
   token: string;
   environment: string;
-  /** Origine de la racine de l'API : `parent_url` du contexte ou setting `onestock_api_root`. */
-  apiRootSource: "context" | "setting";
-  /** Token propre au parent_url, ou token de l'environnement (repli). */
-  tokenSource: "parent_url" | "environment";
+  /** Origine du parent_url du contexte (identifie l'environnement OneStock), null hors OneStock. */
+  parentOrigin: string | null;
 };
 
 /**
@@ -46,10 +44,12 @@ const allowedHosts = () =>
     .filter(Boolean);
 
 /**
- * Racine de l'API OneStock = `parent_url` du contexte (origine de la page OneStock qui affiche l'extension).
- * Le token y étant envoyé, seule une URL https d'un hôte OneStock autorisé est acceptée ; sinon null.
+ * Origine du `parent_url` du contexte (page OneStock qui affiche l'extension) : elle identifie
+ * l'environnement OneStock et sert de clé au token et à l'URL d'API de cet environnement.
+ * Ce n'est PAS l'URL de l'API (le back-office répond 405 aux appels). Seule une URL https d'un
+ * hôte OneStock autorisé est acceptée ; sinon null.
  */
-export function contextApiRoot(parentUrl?: string | null) {
+export function parentOrigin(parentUrl?: string | null) {
   if (!parentUrl) return null;
   try {
     const u = new URL(parentUrl);
@@ -61,45 +61,48 @@ export function contextApiRoot(parentUrl?: string | null) {
   }
 }
 
-/**
- * Identifiants OneStock du site : racine de l'API = `parent_url` du contexte (setting `onestock_api_root`
- * seulement hors OneStock, sans contexte) ; token = setting `onestock_token` de l'environnement.
- */
 /** Une valeur de la colonne environment qui est une origine (https://…) désigne un parent_url, pas un environnement. */
 const isOriginEnv = (env: string) => /^https?:\/\//i.test(env);
 
-export async function getCredentials(siteId: string, parentUrl?: string | null): Promise<Credentials | null> {
-  const rows = await credentialRows(siteId);
-  if (rows.length === 0) return null;
-
-  // Environnement des settings (qualif, prod…), déduit du parent_url ; les lignes « par parent_url » sont à part.
+/**
+ * Résout, pour un site et un parent_url, l'environnement des settings et les valeurs stockées :
+ * - token : depuis OneStock, uniquement celui du parent_url (ligne onestock_token dont
+ *   environment = origine du parent_url, aucun repli) ; hors OneStock, celui de l'environnement ;
+ * - URL de l'API : celle du parent_url si saisie, sinon onestock_api_root de l'environnement
+ *   (ONESTOCK_ENVIRONMENT, sinon « qualif » si le parent_url le contient, sinon le seul, sinon prod).
+ */
+function resolveCredentials(rows: CredentialRow[], siteId: string, parentUrl?: string | null) {
+  const origin = parentOrigin(parentUrl);
   const envs = [...new Set(rows.map((r) => r.environment).filter((e) => !isOriginEnv(e)))];
   const wanted = process.env.ONESTOCK_ENVIRONMENT || (parentUrl && /qualif/i.test(parentUrl) ? "qualif" : undefined);
   const environment =
     (wanted && envs.find((e) => e === wanted)) ||
     (envs.length === 1 ? envs[0] : envs.find((e) => /^prod/i.test(e)) ?? envs[0]) ||
     "";
-
   const pickIn = (key: string, env: string) => {
     const candidates = rows.filter((r) => r.key === key && r.environment === env);
     return (candidates.find((r) => r.site_id === siteId) ?? candidates[0])?.value;
   };
-  const fromContext = contextApiRoot(parentUrl);
-  const apiRoot = fromContext ?? pickIn("onestock_api_root", environment);
-  // Un token par parent_url : depuis OneStock, uniquement la ligne onestock_token dont
-  // environment = origine du parent_url (aucun repli sur un autre token). Hors OneStock
-  // (sans parent_url), le token de l'environnement. Stocké chiffré, déchiffré ici seulement.
-  const stored = fromContext ? pickIn("onestock_token", fromContext) : pickIn("onestock_token", environment);
-  const token = stored ? decryptSecret(stored) : undefined;
-  return apiRoot && token
-    ? {
-        apiRoot,
-        token,
-        environment,
-        apiRootSource: fromContext ? "context" : "setting",
-        tokenSource: fromContext ? "parent_url" : "environment",
-      }
-    : null;
+  return {
+    origin,
+    environment,
+    apiRoot: (origin && pickIn("onestock_api_root", origin)) || pickIn("onestock_api_root", environment),
+    storedToken: origin ? pickIn("onestock_token", origin) : pickIn("onestock_token", environment),
+  };
+}
+
+/** URL de l'API OneStock utilisée pour ce parent_url (et ce site), sans le token. */
+export async function apiRootFor(parentUrl: string | null | undefined, siteId = "") {
+  return resolveCredentials(await credentialRows(siteId), siteId, parentUrl).apiRoot ?? null;
+}
+
+/** Identifiants OneStock du site pour le parent_url du contexte (token déchiffré ici seulement). */
+export async function getCredentials(siteId: string, parentUrl?: string | null): Promise<Credentials | null> {
+  const rows = await credentialRows(siteId);
+  if (rows.length === 0) return null;
+  const { origin, environment, apiRoot, storedToken } = resolveCredentials(rows, siteId, parentUrl);
+  const token = storedToken ? decryptSecret(storedToken) : undefined;
+  return apiRoot && token ? { apiRoot, token, environment, parentOrigin: origin } : null;
 }
 
 /** {{url}} = onestock_api_root (une version, ex. `v3`, peut être ajoutée via ONESTOCK_API_VERSION). */

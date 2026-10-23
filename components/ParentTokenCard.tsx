@@ -2,17 +2,20 @@ import { saveParentTokenAction } from "@/app/actions";
 import { Alert } from "@/components/ui";
 import { withContext } from "@/lib/context";
 import { formatDate, getT, type MessageKey } from "@/lib/i18n";
-import { contextApiRoot } from "@/lib/onestock";
+import { apiRootFor, parentOrigin } from "@/lib/onestock";
 import { parentTokenStatus } from "@/lib/settings";
 
 /** Token OneStock du parent_url du contexte : état (jamais la valeur) et saisie, stocké chiffré. */
 export default async function ParentTokenCard({ params }: { params: Record<string, string | undefined> }) {
   const t = getT(params.lang);
-  const origin = contextApiRoot(params.parent_url);
+  const origin = parentOrigin(params.parent_url);
   if (!origin) return null; // hors OneStock : pas de parent_url, rien à configurer ici
-  const status = await parentTokenStatus(origin).catch(() => ({ exists: false as const }));
+  const [status, usedRoot] = await Promise.all([
+    parentTokenStatus(origin).catch(() => ({ exists: false as const, apiRoot: null })),
+    apiRootFor(params.parent_url, params.site_id ?? "").catch(() => null),
+  ]);
   const errorKey = params.token_error;
-  const known = ["parent_url", "empty", "no_encryption_key"];
+  const known = ["parent_url", "empty", "no_encryption_key", "api_root"];
 
   return (
     <div className="card" id="parent-token">
@@ -24,6 +27,10 @@ export default async function ParentTokenCard({ params }: { params: Record<strin
       {errorKey && (
         <Alert type="danger">{known.includes(errorKey) ? t(`token.error.${errorKey}` as MessageKey) : errorKey}</Alert>
       )}
+      <p className="secondary" style={{ margin: "0 0 12px" }}>
+        {t("token.apiRootUsed")}{" "}
+        {usedRoot ? <span className="tag">{usedRoot}</span> : <span className="badge badge-red">{t("token.noApiRoot")}</span>}
+      </p>
       <div className="token-row">
         <div className="secret-value">
           {status.exists ? (
@@ -44,10 +51,18 @@ export default async function ParentTokenCard({ params }: { params: Record<strin
           <input type="hidden" name="site_id" value={params.site_id ?? ""} />
           <input
             className="input mono"
+            type="url"
+            name="api_root"
+            defaultValue={status.apiRoot ?? ""}
+            placeholder={usedRoot ?? "https://api-….onestock-retail.com"}
+            aria-label={t("token.apiRoot")}
+            title={t("token.apiRoot")}
+          />
+          <input
+            className="input mono"
             type="password"
             name="token"
             autoComplete="new-password"
-            required
             placeholder={status.exists ? t("token.replace") : t("token.enter")}
             aria-label={t("token.title")}
           />

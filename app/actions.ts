@@ -5,7 +5,7 @@ import { invalidateNow, onestockTag, SETTINGS_TAG } from "@/lib/cache";
 import { redirect } from "next/navigation";
 import { clearLogs } from "@/lib/apiLogs";
 import {
-  contextApiRoot,
+  parentOrigin,
   createExtension,
   missingForInstall,
   deleteRemoteExtension,
@@ -14,7 +14,7 @@ import {
   type OneStockExtension,
 } from "@/lib/onestock";
 import { summarizeError } from "@/lib/payload";
-import { copyGlobalSettingsToSite, saveParentToken } from "@/lib/settings";
+import { copyGlobalSettingsToSite, saveParentApiRoot, saveParentToken } from "@/lib/settings";
 import { randomUUID } from "node:crypto";
 import { encryptSecret, isSecretKey, MissingKeyError } from "@/lib/secrets";
 import { ensureSchema, getSql, isWritableColumn, nameKey, readCatalog, type CatalogInjectionPoint } from "@/lib/db";
@@ -282,12 +282,16 @@ export async function refreshFromOneStock(form: FormData) {
 /** Enregistre le token OneStock du parent_url du contexte (un token par parent_url, stocké chiffré). */
 export async function saveParentTokenAction(form: FormData) {
   const back = text(form, "back");
-  const origin = contextApiRoot(text(form, "parent_url"));
+  const origin = parentOrigin(text(form, "parent_url"));
   const token = String(form.get("token") ?? "").trim();
+  const apiRoot = text(form, "api_root").replace(/\/+$/, "");
   if (!origin) redirect(backWith(back, { token_error: "parent_url" }));
-  if (!token) redirect(backWith(back, { token_error: "empty" }));
+  if (!token && !apiRoot) redirect(backWith(back, { token_error: "empty" }));
+  // L'URL de l'API recevra le token : https sur un hôte OneStock autorisé uniquement.
+  if (apiRoot && !parentOrigin(apiRoot)) redirect(backWith(back, { token_error: "api_root" }));
   try {
-    await saveParentToken(origin!, token);
+    if (apiRoot) await saveParentApiRoot(origin!, apiRoot);
+    if (token) await saveParentToken(origin!, token);
   } catch (e) {
     redirect(backWith(back, { token_error: e instanceof MissingKeyError ? "no_encryption_key" : (e as Error).message }));
   }

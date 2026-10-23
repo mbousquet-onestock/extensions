@@ -8,7 +8,7 @@ import ApiExtensionDetails from "@/components/ApiExtensionDetails";
 import ExtensionForm, { type ExtensionFormValues } from "@/components/ExtensionForm";
 import { nameKey, readCatalog, type Extension } from "@/lib/db";
 import { formatDate, getT, type MessageKey } from "@/lib/i18n";
-import { contextApiRoot, getCredentials, getInstalledExtensions, iconSrc, type OneStockExtension } from "@/lib/onestock";
+import { parentOrigin, getCredentials, getInstalledExtensions, iconSrc, type OneStockExtension } from "@/lib/onestock";
 import { summarizeError } from "@/lib/payload";
 import {
   addToCatalog,
@@ -88,7 +88,7 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
   if (siteId && !error) {
     try {
       const creds = await getCredentials(siteId, params.parent_url);
-      const origin = contextApiRoot(params.parent_url);
+      const origin = parentOrigin(params.parent_url);
       if (!creds && origin) tokenMissing = origin;
       else if (!creds) apiProblem = t("ext.noCredentials", { site: siteId });
       else {

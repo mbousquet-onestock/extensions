@@ -227,10 +227,21 @@ export async function deleteSetting(id: SettingId) {
 /** Ligne du token d'un parent_url : key onestock_token, site global, extension *, environment = origine. */
 export const parentTokenId = (origin: string): SettingId => ({ key: "onestock_token", site_id: "", extension_id: "*", environment: origin });
 
-/** État du token d'un parent_url (jamais sa valeur). */
+/** URL de l'API OneStock propre à un parent_url : key onestock_api_root, environment = origine. */
+export const parentApiRootId = (origin: string): SettingId => ({ ...parentTokenId(origin), key: "onestock_api_root" });
+
+/** État du token d'un parent_url (jamais sa valeur) et URL d'API qui lui est propre. */
 export async function parentTokenStatus(origin: string) {
-  const s = await readSetting(parentTokenId(origin));
-  return s ? { exists: true, encrypted: s.encrypted, updated_at: s.updated_at } : { exists: false as const };
+  const [s, root] = await Promise.all([readSetting(parentTokenId(origin)), readSetting(parentApiRootId(origin))]);
+  const apiRoot = root?.value ?? null;
+  return s ? { exists: true, encrypted: s.encrypted, updated_at: s.updated_at, apiRoot } : { exists: false as const, apiRoot };
+}
+
+/** Enregistre l'URL de l'API OneStock d'un parent_url. */
+export async function saveParentApiRoot(origin: string, apiRoot: string) {
+  const id = parentApiRootId(origin);
+  const updated = await updateSetting(id, { value: apiRoot });
+  if (!updated) await createSetting({ ...id, value: apiRoot, scope: "global" });
 }
 
 /** Enregistre (chiffré) le token d'un parent_url : met à jour la ligne existante ou la crée. */

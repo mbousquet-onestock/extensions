@@ -1,5 +1,5 @@
 import { checkApiKey } from "@/lib/apiAuth";
-import { contextApiRoot } from "@/lib/onestock";
+import { parentOrigin } from "@/lib/onestock";
 import { logApiCallLater } from "@/lib/apiLogs";
 import { MissingKeyError, isSecretKey } from "@/lib/secrets";
 import type { SettingId } from "@/lib/settings";
@@ -112,19 +112,16 @@ export function valueFrom(v: unknown): string | undefined {
 export const wantsDecrypt = (url: URL) => ["1", "true"].includes(url.searchParams.get("decrypt") ?? "");
 
 /**
- * `onestock_api_root` suit le contexte OneStock : si l'appel fournit `?parent_url=` (hôte OneStock autorisé),
- * la valeur renvoyée pour ce setting est cette URL (origine), à la place de la valeur stockée.
- */
-/**
- * Avec ?parent_url=, onestock_token est celui de ce parent_url uniquement :
- * les lignes onestock_token d'un autre environnement sont écartées.
+ * Avec ?parent_url=, onestock_token est celui de ce parent_url uniquement : les lignes
+ * onestock_token d'un autre environnement sont écartées, ainsi que les onestock_api_root
+ * propres à un autre parent_url.
  */
 export function onlyParentToken<T extends { key: string; environment: string }>(url: URL, settings: T[]): T[] {
-  const origin = contextApiRoot(url.searchParams.get("parent_url"));
-  return origin ? settings.filter((s) => s.key !== "onestock_token" || s.environment === origin) : settings;
-}
-
-export function withContextApiRoot<T extends { key: string; value: string | null }>(url: URL, setting: T): T {
-  const root = contextApiRoot(url.searchParams.get("parent_url"));
-  return root && setting.key === "onestock_api_root" ? { ...setting, value: root, from_context: true } : setting;
+  const origin = parentOrigin(url.searchParams.get("parent_url"));
+  if (!origin) return settings;
+  return settings.filter((s) =>
+    s.key === "onestock_token" ? s.environment === origin
+    : s.key === "onestock_api_root" ? !/^https?:\/\//i.test(s.environment) || s.environment === origin
+    : true,
+  );
 }
