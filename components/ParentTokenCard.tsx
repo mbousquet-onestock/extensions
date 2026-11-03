@@ -11,7 +11,7 @@ export default async function ParentTokenCard({ params }: { params: Record<strin
   const origin = parentOrigin(params.parent_url);
   if (!origin) return null; // hors OneStock : pas de parent_url, rien à configurer ici
   const [status, usedRoot] = await Promise.all([
-    parentTokenStatus(origin).catch(() => ({ exists: false as const, apiRoot: null })),
+    parentTokenStatus(origin).catch(() => ({ exists: false as const, apiRoot: null, hasSecret: false })),
     apiRootFor(params.parent_url, params.site_id ?? "", params.api_url).catch(() => null),
   ]);
   const errorKey = params.token_error;
@@ -30,6 +30,13 @@ export default async function ParentTokenCard({ params }: { params: Record<strin
       <p className="secondary" style={{ margin: "0 0 12px" }}>
         {t("token.apiRootUsed")}{" "}
         {usedRoot ? <span className="tag">{usedRoot}</span> : <span className="badge badge-red">{t("token.noApiRoot")}</span>}
+      </p>
+      <p className="secondary" style={{ margin: "0 0 12px" }}>
+        {status.hasSecret ? (
+          <span className="badge badge-brand">{t("token.secretSet")}</span>
+        ) : (
+          <span className="badge badge-orange">{t("token.secretMissing")}</span>
+        )}
       </p>
       <div className="token-row">
         <div className="secret-value">
@@ -65,6 +72,15 @@ export default async function ParentTokenCard({ params }: { params: Record<strin
             autoComplete="new-password"
             placeholder={status.exists ? t("token.replace") : t("token.enter")}
             aria-label={t("token.title")}
+          />
+          <input
+            className="input mono"
+            type="password"
+            name="extension_secret"
+            autoComplete="new-password"
+            placeholder={t("token.secretEnter")}
+            aria-label={t("token.secret")}
+            title={t("token.secret")}
           />
           <button className="btn btn-primary" type="submit">{t("common.save")}</button>
         </form>

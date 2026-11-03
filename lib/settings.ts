@@ -230,11 +230,34 @@ export const parentTokenId = (origin: string): SettingId => ({ key: "onestock_to
 /** URL de l'API OneStock propre à un parent_url : key onestock_api_root, environment = origine. */
 export const parentApiRootId = (origin: string): SettingId => ({ ...parentTokenId(origin), key: "onestock_api_root" });
 
-/** État du token d'un parent_url (jamais sa valeur) et URL d'API qui lui est propre. */
+/** Secret de signature des extensions (extension_signature) d'un parent_url : key extension_secret, chiffré. */
+export const parentSecretId = (origin: string): SettingId => ({ ...parentTokenId(origin), key: "extension_secret" });
+
+/** État du token d'un parent_url (jamais sa valeur), URL d'API qui lui est propre et présence du secret de signature. */
 export async function parentTokenStatus(origin: string) {
-  const [s, root] = await Promise.all([readSetting(parentTokenId(origin)), readSetting(parentApiRootId(origin))]);
+  const [s, root, secret] = await Promise.all([
+    readSetting(parentTokenId(origin)),
+    readSetting(parentApiRootId(origin)),
+    readSetting(parentSecretId(origin)),
+  ]);
   const apiRoot = root?.value ?? null;
-  return s ? { exists: true, encrypted: s.encrypted, updated_at: s.updated_at, apiRoot } : { exists: false as const, apiRoot };
+  const hasSecret = Boolean(secret);
+  return s
+    ? { exists: true, encrypted: s.encrypted, updated_at: s.updated_at, apiRoot, hasSecret }
+    : { exists: false as const, apiRoot, hasSecret };
+}
+
+/** Secrets de signature d'un parent_url, déchiffrés (côté serveur uniquement) : une valeur, ou plusieurs séparées par des virgules. */
+export async function parentSecrets(origin: string): Promise<string[]> {
+  const s = await readSetting(parentSecretId(origin), { decrypt: true });
+  return (s?.value ?? "").split(",").map((v) => v.trim()).filter(Boolean);
+}
+
+/** Enregistre (chiffré) le secret de signature d'un parent_url. */
+export async function saveParentSecret(origin: string, secret: string) {
+  const id = parentSecretId(origin);
+  const updated = await updateSetting(id, { value: secret });
+  if (!updated) await createSetting({ ...id, value: secret, scope: "global" });
 }
 
 /** Mémorise l'api_url reçue de OneStock pour un parent_url si elle a changé (true si enregistrée). */

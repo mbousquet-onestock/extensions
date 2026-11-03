@@ -14,7 +14,7 @@ import {
   type OneStockExtension,
 } from "@/lib/onestock";
 import { summarizeError } from "@/lib/payload";
-import { copyGlobalSettingsToSite, rememberParentApiRoot, saveParentApiRoot, saveParentToken } from "@/lib/settings";
+import { copyGlobalSettingsToSite, rememberParentApiRoot, saveParentApiRoot, saveParentSecret, saveParentToken } from "@/lib/settings";
 import { randomUUID } from "node:crypto";
 import { encryptSecret, isSecretKey, MissingKeyError } from "@/lib/secrets";
 import { ensureSchema, getSql, isWritableColumn, nameKey, readCatalog, type CatalogInjectionPoint } from "@/lib/db";
@@ -285,13 +285,15 @@ export async function saveParentTokenAction(form: FormData) {
   const origin = parentOrigin(text(form, "parent_url"));
   const token = String(form.get("token") ?? "").trim();
   const apiRoot = text(form, "api_root").replace(/\/+$/, "");
+  const secret = String(form.get("extension_secret") ?? "").trim();
   if (!origin) redirect(backWith(back, { token_error: "parent_url" }));
-  if (!token && !apiRoot) redirect(backWith(back, { token_error: "empty" }));
+  if (!token && !apiRoot && !secret) redirect(backWith(back, { token_error: "empty" }));
   // L'URL de l'API recevra le token : https sur un hôte OneStock autorisé uniquement.
   if (apiRoot && !parentOrigin(apiRoot)) redirect(backWith(back, { token_error: "api_root" }));
   try {
     if (apiRoot) await saveParentApiRoot(origin!, apiRoot);
     if (token) await saveParentToken(origin!, token);
+    if (secret) await saveParentSecret(origin!, secret);
   } catch (e) {
     redirect(backWith(back, { token_error: e instanceof MissingKeyError ? "no_encryption_key" : (e as Error).message }));
   }
