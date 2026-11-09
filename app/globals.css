@@ -340,3 +340,9 @@ pre.code { margin: 6px 0 0; padding: 8px; background: var(--neutral-30); border-
 .token-row { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-l); flex-wrap: wrap; }
 .token-form { display: flex; gap: var(--spacing-m); flex: 1; justify-content: flex-end; min-width: 280px; }
 .token-form .input { flex: 1; max-width: 420px; }
+
+/* Encadré « Token OneStock » : sections empilées (login, token, API / secret). */
+.access-form { display: flex; flex-direction: column; gap: var(--spacing-m); }
+.access-form .section-title { margin-top: var(--spacing-s); }
+.access-form .token-form { justify-content: flex-start; flex-wrap: wrap; }
+.access-form .checkbox { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }

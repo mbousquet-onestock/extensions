@@ -14,7 +14,7 @@ import {
   type OneStockExtension,
 } from "@/lib/onestock";
 import { summarizeError } from "@/lib/payload";
-import { copyGlobalSettingsToSite, rememberParentApiRoot, saveParentApiRoot, saveParentSecret, saveParentToken } from "@/lib/settings";
+import { copyGlobalSettingsToSite, rememberParentApiRoot, saveParentApiRoot, saveParentLogin, saveParentSecret, saveParentToken, clearParentLogin } from "@/lib/settings";
 import { randomUUID } from "node:crypto";
 import { encryptSecret, isSecretKey, MissingKeyError } from "@/lib/secrets";
 import { ensureSchema, getSql, isWritableColumn, nameKey, readCatalog, type CatalogInjectionPoint } from "@/lib/db";
@@ -286,14 +286,19 @@ export async function saveParentTokenAction(form: FormData) {
   const token = String(form.get("token") ?? "").trim();
   const apiRoot = text(form, "api_root").replace(/\/+$/, "");
   const secret = String(form.get("extension_secret") ?? "").trim();
+  const loginUser = text(form, "login_user_id");
+  const loginPassword = String(form.get("login_password") ?? "");
+  const clearLogin = form.get("clear_login") === "1";
   if (!origin) redirect(backWith(back, { token_error: "parent_url" }));
-  if (!token && !apiRoot && !secret) redirect(backWith(back, { token_error: "empty" }));
+  if (!token && !apiRoot && !secret && !loginUser && !loginPassword && !clearLogin) redirect(backWith(back, { token_error: "empty" }));
   // L'URL de l'API recevra le token : https sur un hôte OneStock autorisé uniquement.
   if (apiRoot && !parentOrigin(apiRoot)) redirect(backWith(back, { token_error: "api_root" }));
   try {
     if (apiRoot) await saveParentApiRoot(origin!, apiRoot);
     if (token) await saveParentToken(origin!, token);
     if (secret) await saveParentSecret(origin!, secret);
+    if (clearLogin) await clearParentLogin(origin!);
+    else if (loginUser || loginPassword) await saveParentLogin(origin!, { userId: loginUser, password: loginPassword });
   } catch (e) {
     redirect(backWith(back, { token_error: e instanceof MissingKeyError ? "no_encryption_key" : (e as Error).message }));
   }

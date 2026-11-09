@@ -95,7 +95,8 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
       const origin = parentOrigin(params.parent_url);
       if (!creds && origin) {
         // Token absent, ou URL de l'API pas encore connue (api_url pas encore reçue de OneStock).
-        if ((await parentTokenStatus(origin)).exists) waitingApiUrl = true;
+        const st = await parentTokenStatus(origin);
+        if (st.exists || (st.login.userId && st.login.hasPassword)) waitingApiUrl = true;
         else tokenMissing = origin;
       }
       else if (!creds) apiProblem = t("ext.noCredentials", { site: siteId });

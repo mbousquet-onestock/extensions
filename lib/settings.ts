@@ -233,18 +233,40 @@ export const parentApiRootId = (origin: string): SettingId => ({ ...parentTokenI
 /** Secret de signature des extensions (extension_signature) d'un parent_url : key extension_secret, chiffré. */
 export const parentSecretId = (origin: string): SettingId => ({ ...parentTokenId(origin), key: "extension_secret" });
 
+/** Identifiants de login OneStock ({{url}}/login) d'un parent_url : user_id en clair, password chiffré. */
+export const parentUserId = (origin: string): SettingId => ({ ...parentTokenId(origin), key: "onestock_user_id" });
+export const parentPasswordId = (origin: string): SettingId => ({ ...parentTokenId(origin), key: "onestock_password" });
+
+/** Enregistre user_id et/ou password (chiffré) de login d'un parent_url. */
+export async function saveParentLogin(origin: string, { userId, password }: { userId?: string; password?: string }) {
+  for (const [id, value] of [[parentUserId(origin), userId], [parentPasswordId(origin), password]] as const) {
+    if (!value) continue;
+    const updated = await updateSetting(id, { value });
+    if (!updated) await createSetting({ ...id, value, scope: "global" });
+  }
+}
+
+/** Supprime les identifiants de login d'un parent_url (retour au token saisi). */
+export async function clearParentLogin(origin: string) {
+  await deleteSetting(parentUserId(origin));
+  await deleteSetting(parentPasswordId(origin));
+}
+
 /** État du token d'un parent_url (jamais sa valeur), URL d'API qui lui est propre et présence du secret de signature. */
 export async function parentTokenStatus(origin: string) {
-  const [s, root, secret] = await Promise.all([
+  const [s, root, secret, user, password] = await Promise.all([
     readSetting(parentTokenId(origin)),
     readSetting(parentApiRootId(origin)),
     readSetting(parentSecretId(origin)),
+    readSetting(parentUserId(origin)),
+    readSetting(parentPasswordId(origin)),
   ]);
   const apiRoot = root?.value ?? null;
   const hasSecret = Boolean(secret);
+  const login = { userId: user?.value ?? null, hasPassword: Boolean(password) };
   return s
-    ? { exists: true, encrypted: s.encrypted, updated_at: s.updated_at, apiRoot, hasSecret }
-    : { exists: false as const, apiRoot, hasSecret };
+    ? { exists: true, encrypted: s.encrypted, updated_at: s.updated_at, apiRoot, hasSecret, login }
+    : { exists: false as const, apiRoot, hasSecret, login };
 }
 
 /** Secrets de signature d'un parent_url, déchiffrés (côté serveur uniquement) : une valeur, ou plusieurs séparées par des virgules. */

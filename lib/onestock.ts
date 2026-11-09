@@ -16,6 +16,10 @@ export type Credentials = {
   parentOrigin: string | null;
   /** D'où vient l'URL de l'API : api_url de onestock_data, setting du parent_url ou de l'environnement. */
   apiRootSource: "api_url" | "parent_url" | "environment";
+  /** Token obtenu par `{{url}}/login` (user_id / password du parent_url) ou token saisi (setting onestock_token). */
+  tokenSource: "login" | "setting";
+  /** Login : redemande un token (après un 401) et le renvoie. */
+  relogin?: () => Promise<string>;
 };
 
 /**
@@ -31,7 +35,7 @@ const credentialRows = (siteId: string) =>
     async () =>
       (await getSql()`
         SELECT key, value, site_id, environment FROM settings
-        WHERE key IN ('onestock_api_root', 'onestock_token')
+        WHERE key IN ('onestock_api_root', 'onestock_token', 'onestock_user_id', 'onestock_password')
           AND (site_id = ${siteId} OR site_id IS NULL OR site_id IN ('*', ''))
           AND (extension_id IS NULL OR extension_id IN ('*', '') OR scope = 'global')`) as CredentialRow[],
     ["onestock-credentials", siteId],
@@ -95,6 +99,9 @@ function resolveCredentials(rows: CredentialRow[], siteId: string, parentUrl?: s
     apiRoot: origin ? fromContext || fromParent : pickIn("onestock_api_root", environment),
     apiRootSource: (fromContext ? "api_url" : fromParent ? "parent_url" : "environment") as Credentials["apiRootSource"],
     storedToken: origin ? pickIn("onestock_token", origin) : pickIn("onestock_token", environment),
+    // Identifiants de login (password chiffré) : ceux du parent_url, hors OneStock ceux de l'environnement.
+    loginUser: pickIn("onestock_user_id", origin ?? environment),
+    loginPassword: pickIn("onestock_password", origin ?? environment),
   };
 }
 
@@ -111,9 +118,94 @@ export async function getCredentials(
 ): Promise<Credentials | null> {
   const rows = await credentialRows(siteId);
   if (rows.length === 0) return null;
-  const { origin, environment, apiRoot, apiRootSource, storedToken } = resolveCredentials(rows, siteId, parentUrl, apiUrl);
+  const { origin, environment, apiRoot, apiRootSource, storedToken, loginUser, loginPassword } = resolveCredentials(
+    rows,
+    siteId,
+    parentUrl,
+    apiUrl,
+  );
+  if (!apiRoot) return null;
+  const base = { apiRoot, environment, parentOrigin: origin, apiRootSource };
+
+  // user_id + password saisis : le token vient de {{url}}/login (prioritaire sur un token saisi).
+  if (loginUser && loginPassword) {
+    const password = decryptSecret(loginPassword);
+    const login = { apiRoot, siteId, userId: loginUser, password };
+    const token = await loginToken(login);
+    return { ...base, token, tokenSource: "login", relogin: () => loginToken(login, { force: true }) };
+  }
   const token = storedToken ? decryptSecret(storedToken) : undefined;
-  return apiRoot && token ? { apiRoot, token, environment, parentOrigin: origin, apiRootSource } : null;
+  return token ? { ...base, token, tokenSource: "setting" } : null;
+}
+
+// ---------- Login ({{url}}/login) ----------
+
+type LoginInput = { apiRoot: string; siteId: string; userId: string; password: string };
+
+/** Tokens obtenus par login, en mémoire de l'instance (jamais en base ni dans le navigateur). */
+const loginCache = new Map<string, { token: string; expires: number; password: string }>();
+const LOGIN_TTL_MS = Number(process.env.ONESTOCK_LOGIN_TTL_MINUTES || 50) * 60 * 1000;
+
+/**
+ * Token OneStock par `POST {{url}}/login` avec `{ password, site_id, user_id }`. Réutilisé jusqu'à
+ * ONESTOCK_LOGIN_TTL_MINUTES (50 min par défaut) ou jusqu'à un 401 (`force`). Appel journalisé, password et token masqués.
+ */
+export async function loginToken(input: LoginInput, { force = false } = {}) {
+  const key = `${input.apiRoot}|${input.siteId}|${input.userId}`;
+  const cached = loginCache.get(key);
+  if (!force && cached && cached.password === input.password && cached.expires > Date.now()) return cached.token;
+
+  const url = `${apiBase(input.apiRoot)}/login`;
+  const body = { password: input.password, site_id: input.siteId, user_id: input.userId };
+  const started = Date.now();
+  let status: number | null = null;
+  let parsed: unknown = undefined;
+  let error: string | null = null;
+  try {
+    const res = await requestJson("POST", url, body);
+    status = res.status;
+    try {
+      parsed = res.text ? JSON.parse(res.text) : null;
+    } catch {
+      parsed = res.text;
+    }
+    if (status >= 400) error = `OneStock login answered HTTP ${status}: ${typeof parsed === "string" ? parsed : JSON.stringify(parsed)}`;
+  } catch (e) {
+    error = `OneStock login unreachable: ${(e as Error).message}`;
+  }
+  const token = error ? undefined : tokenFrom(parsed);
+  if (!error && !token) error = "OneStock login: no token in the response";
+
+  logApiCallLater({
+    siteId: input.siteId,
+    api: "OneStock",
+    method: "POST",
+    path: url,
+    status,
+    durationMs: Date.now() - started,
+    request: body,
+    response: error ? null : parsed,
+    error,
+    result: error ? null : `token for ${input.userId}`,
+  });
+
+  if (error) {
+    loginCache.delete(key);
+    throw new OneStockError(error, status);
+  }
+  loginCache.set(key, { token: token!, expires: Date.now() + LOGIN_TTL_MS, password: input.password });
+  return token!;
+}
+
+/** Token dans la réponse du login : `token`, `access_token` ou `data.token`, ou la réponse elle-même si c'est une chaîne. */
+function tokenFrom(v: unknown): string | undefined {
+  if (typeof v === "string" && v.trim() && !v.trim().startsWith("<")) return v.trim();
+  if (v && typeof v === "object") {
+    const o = v as Record<string, unknown>;
+    for (const k of ["token", "access_token", "accessToken"]) if (typeof o[k] === "string" && o[k]) return o[k] as string;
+    if (o.data) return tokenFrom(o.data);
+  }
+  return undefined;
 }
 
 /** {{url}} = onestock_api_root (une version, ex. `v3`, peut être ajoutée via ONESTOCK_API_VERSION). */
@@ -179,6 +271,23 @@ export async function callOneStock<T>(
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
   path: string,
   extra: Record<string, unknown> = {},
+) {
+  try {
+    return await callOnce<T>(creds, siteId, method, path, extra);
+  } catch (e) {
+    // Token obtenu par login refusé (expiré) : nouveau login puis un seul nouvel essai.
+    if ((e as OneStockError).status !== 401 || !creds.relogin) throw e;
+    creds.token = await creds.relogin();
+    return callOnce<T>(creds, siteId, method, path, extra);
+  }
+}
+
+async function callOnce<T>(
+  creds: Credentials,
+  siteId: string,
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
+  path: string,
+  extra: Record<string, unknown>,
 ) {
   const url = `${apiBase(creds.apiRoot)}${path}`;
   const body = { site_id: siteId, token: creds.token, ...extra };
