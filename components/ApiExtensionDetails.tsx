@@ -1,4 +1,5 @@
 import Payload from "@/components/Payload";
+import SecretReveal from "@/components/SecretReveal";
 import { Icon } from "@/components/ui";
 import { formatDate, type T } from "@/lib/i18n";
 import { iconSrc, type OneStockExtension } from "@/lib/onestock";
@@ -35,7 +36,7 @@ export default function ApiExtensionDetails({
 }: {
   ext: OneStockExtension;
   t: T;
-  dateParams: { lang?: string; locale?: string; timezone?: string };
+  dateParams: { lang?: string; locale?: string; timezone?: string; site_id?: string; parent_url?: string; api_url?: string };
 }) {
   const date = (s?: number) => (s ? formatDate(new Date(s * 1000), dateParams) : "—");
   const link = (u?: string) =>
@@ -59,6 +60,13 @@ export default function ApiExtensionDetails({
         <dd>{link(ext.url)}</dd>
         <dt>test_url</dt>
         <dd>{link(ext.test_url)}</dd>
+        <dt>secret hash</dt>
+        <dd>
+          <SecretReveal
+            ctx={{ site_id: dateParams.site_id, parent_url: dateParams.parent_url, api_url: dateParams.api_url, os_id: ext.id }}
+            labels={secretLabels(t)}
+          />
+        </dd>
         <dt>creation_date</dt>
         <dd>{date(ext.creation_date)}</dd>
         <dt>last_update</dt>
@@ -101,3 +109,13 @@ export default function ApiExtensionDetails({
     </section>
   );
 }
+
+/** Libellés du bouton « secret hash ». */
+export const secretLabels = (t: T) => ({
+  show: t("secret.show"),
+  hide: t("secret.hide"),
+  copy: t("calls.copy"),
+  copied: t("calls.copied"),
+  notFound: t("secret.notFound"),
+  noCredentials: t("secret.noCredentials"),
+});

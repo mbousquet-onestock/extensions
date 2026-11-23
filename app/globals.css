@@ -346,3 +346,7 @@ pre.code { margin: 6px 0 0; padding: 8px; background: var(--neutral-30); border-
 .access-form .section-title { margin-top: var(--spacing-s); }
 .access-form .token-form { justify-content: flex-start; flex-wrap: wrap; }
 .access-form .checkbox { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+
+/* Secret hash d'une extension (affiché à la demande). */
+.secret-reveal { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; word-break: break-all; }
+.secret-reveal .secret-error { color: var(--color-red, #d64545); font-size: 12px; }

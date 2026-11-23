@@ -11,10 +11,9 @@ import {
   deleteRemoteExtension,
   getCredentials,
   getExtension,
-  type OneStockExtension,
-} from "@/lib/onestock";
+  type OneStockExtension, fetchExtensionSecret } from "@/lib/onestock";
 import { summarizeError } from "@/lib/payload";
-import { copyGlobalSettingsToSite, rememberParentApiRoot, saveParentApiRoot, saveParentLogin, saveParentSecret, saveParentToken, clearParentLogin } from "@/lib/settings";
+import { copyGlobalSettingsToSite, rememberParentApiRoot, saveParentApiRoot, saveParentLogin, saveParentSecret, saveParentToken, clearParentLogin, saveExtensionSecret, readExtensionSecret } from "@/lib/settings";
 import { randomUUID } from "node:crypto";
 import { encryptSecret, isSecretKey, MissingKeyError } from "@/lib/secrets";
 import { ensureSchema, getSql, isWritableColumn, nameKey, readCatalog, type CatalogInjectionPoint } from "@/lib/db";
@@ -113,10 +112,21 @@ export async function installOnEnvironment(form: FormData) {
 
   let error: string | null = null;
   let copied = 0;
+  let created: { id?: string; secret?: string } = {};
   try {
-    await createExtension(ctx!.creds, ctx!.siteId, ext!);
+    created = await createExtension(ctx!.creds, ctx!.siteId, ext!);
   } catch (e) {
     error = apiError(e);
+  }
+  // Secret hash généré par OneStock à la création : enregistré chiffré pour l'extension et l'environnement.
+  let secret: "saved" | "missing" = "missing";
+  if (!error && created.id && created.secret) {
+    try {
+      await saveExtensionSecret(ctx!.creds.parentOrigin ?? ctx!.creds.environment, created.id, created.secret);
+      secret = "saved";
+    } catch {
+      secret = "missing";
+    }
   }
   if (!error) {
     // Variables globales de l'extension (site_id vide) dupliquées sur le site de l'environnement.
@@ -132,7 +142,12 @@ export async function installOnEnvironment(form: FormData) {
   revalidatePath("/");
   revalidatePath("/extensions/[id]/settings", "page");
   redirect(
-    backWith(back, error ? { action_error: error } : { done: "installed", name, copied: String(copied) }),
+    backWith(
+      back,
+      error
+        ? { action_error: error }
+        : { done: "installed", name, copied: String(copied), secret, ...(created.id && { os_id: created.id }) },
+    ),
   );
 }
 
@@ -197,7 +212,7 @@ export async function clearLogsAction(form: FormData) {
 
 function backWith(back: string, extra: Record<string, string>) {
   const url = new URL(back.startsWith("/") ? back : "/", "http://x");
-  for (const k of ["edit", "new", "edit_key", "edit_site", "edit_ext", "edit_env", "saved", "error", "purged", "cleared", "done", "name", "action_error", "copied", "fields", "token_saved", "token_error"]) url.searchParams.delete(k);
+  for (const k of ["edit", "new", "edit_key", "edit_site", "edit_ext", "edit_env", "saved", "error", "purged", "cleared", "done", "name", "action_error", "copied", "fields", "token_saved", "token_error", "secret", "os_id"]) url.searchParams.delete(k);
   for (const [k, v] of Object.entries(extra)) url.searchParams.set(k, v);
   return `${url.pathname}${url.search}`;
 }
@@ -323,4 +338,30 @@ export async function rememberApiUrlAction(parentUrl: string, apiUrl: string) {
   }
   invalidateNow(SETTINGS_TAG);
   return true;
+}
+
+/**
+ * Secret hash d'une extension installée, pour l'afficher à la demande (bouton « Afficher ») :
+ * celui enregistré à la création, sinon relu par GET /extensions/{id} (puis enregistré chiffré).
+ */
+export async function revealExtensionSecretAction(ctx: {
+  site_id?: string;
+  parent_url?: string;
+  api_url?: string;
+  os_id: string;
+}): Promise<{ secret: string } | { error: "no_credentials" | "not_found" | string }> {
+  if (!ctx.site_id || !ctx.os_id) return { error: "no_credentials" };
+  const creds = await getCredentials(ctx.site_id, ctx.parent_url || null, ctx.api_url || null).catch(() => null);
+  if (!creds) return { error: "no_credentials" };
+  const environment = creds.parentOrigin ?? creds.environment;
+  try {
+    const stored = await readExtensionSecret(environment, ctx.os_id);
+    if (stored?.value) return { secret: stored.value };
+    const fetched = await fetchExtensionSecret(creds, ctx.site_id, ctx.os_id);
+    if (!fetched) return { error: "not_found" };
+    await saveExtensionSecret(environment, ctx.os_id, fetched).catch(() => {});
+    return { secret: fetched };
+  } catch (e) {
+    return { error: apiError(e) };
+  }
 }

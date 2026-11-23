@@ -269,6 +269,29 @@ export async function parentTokenStatus(origin: string) {
     : { exists: false as const, apiRoot, hasSecret, login };
 }
 
+/**
+ * Secret hash d'une extension (généré par OneStock à sa création) : key extension_secret,
+ * extension_id = id OneStock de l'extension, environment = origine du parent_url (ou environnement), chiffré.
+ */
+export const extensionSecretId = (environment: string, extensionId: string): SettingId => ({
+  key: "extension_secret",
+  site_id: "",
+  extension_id: extensionId,
+  environment,
+});
+
+export async function saveExtensionSecret(environment: string, extensionId: string, secret: string) {
+  const id = extensionSecretId(environment, extensionId);
+  const updated = await updateSetting(id, { value: secret });
+  if (!updated) await createSetting({ ...id, value: secret, scope: "extension" });
+}
+
+/** Secret hash d'une extension, déchiffré (côté serveur uniquement), ou null. */
+export async function readExtensionSecret(environment: string, extensionId: string) {
+  const s = await readSetting(extensionSecretId(environment, extensionId), { decrypt: true });
+  return s ? { value: s.value, updated_at: s.updated_at } : null;
+}
+
 /** Secrets de signature d'un parent_url, déchiffrés (côté serveur uniquement) : une valeur, ou plusieurs séparées par des virgules. */
 export async function parentSecrets(origin: string): Promise<string[]> {
   const s = await readSetting(parentSecretId(origin), { decrypt: true });

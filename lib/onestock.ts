@@ -392,7 +392,7 @@ async function fetchInstalledExtensions(creds: Credentials, siteId: string) {
           "GET",
           `/extensions/${encodeURIComponent(id)}`,
         );
-        return res?.extension ? { ...res.extension, id: res.extension.id || id } : { id, name: id };
+        return res?.extension ? { ...withoutSecret(res.extension), id: res.extension.id || id } : { id, name: id };
       } catch {
         return { id, name: id } as OneStockExtension;
       }
@@ -410,7 +410,7 @@ export async function getExtension(creds: Credentials, siteId: string, id: strin
         "GET",
         `/extensions/${encodeURIComponent(id)}`,
       );
-      return res?.extension ?? null;
+      return res?.extension ? withoutSecret(res.extension) : null;
     },
     ["onestock-extension", creds.apiRoot, creds.environment, siteId, id],
     { tags: [onestockTag(siteId)], revalidate: 60 },
@@ -484,8 +484,48 @@ export function extensionBody(ext: ExtensionPayload) {
 }
 
 /** Crée l'extension sur l'environnement : `POST {url}/extensions` avec `{ site_id, token, extension }`. */
+/**
+ * Crée l'extension sur l'environnement. OneStock génère alors l'id et le secret hash de l'extension
+ * (signature extension_signature, commun à tous ses points d'injection) : ils sont renvoyés à part.
+ */
 export async function createExtension(creds: Credentials, siteId: string, ext: ExtensionPayload) {
-  return callOneStock<unknown>(creds, siteId, "POST", "/extensions", { extension: extensionBody(ext) });
+  const res = await callOneStock<unknown>(creds, siteId, "POST", "/extensions", { extension: extensionBody(ext) });
+  return { id: extensionIdFrom(res), secret: secretFrom(res) };
+}
+
+/**
+ * Secret hash de l'extension relu par `GET /extensions/{id}` (sans cache), s'il y figure.
+ */
+export async function fetchExtensionSecret(creds: Credentials, siteId: string, id: string) {
+  const res = await callOneStock<unknown>(creds, siteId, "GET", `/extensions/${encodeURIComponent(id)}`);
+  return secretFrom(res);
+}
+
+/** Champs qui portent le secret hash dans les réponses OneStock (nom exact non documenté publiquement). */
+const SECRET_FIELD = /secret|hash/i;
+
+/** Secret hash dans une réponse : à la racine, sous `extension` ou `data` (une chaîne non vide). */
+export function secretFrom(v: unknown, depth = 0): string | undefined {
+  if (!v || typeof v !== "object" || depth > 2) return undefined;
+  const o = v as Record<string, unknown>;
+  for (const [k, val] of Object.entries(o)) {
+    if (SECRET_FIELD.test(k) && typeof val === "string" && val.trim()) return val.trim();
+    if (SECRET_FIELD.test(k) && Array.isArray(val) && typeof val[0] === "string" && val[0]) return val.join(",");
+  }
+  return secretFrom(o.extension, depth + 1) ?? secretFrom(o.data, depth + 1);
+}
+
+function extensionIdFrom(v: unknown): string | undefined {
+  if (!v || typeof v !== "object") return undefined;
+  const o = v as Record<string, unknown>;
+  if (typeof o.id === "string" && o.id) return o.id;
+  if (typeof o.extension_id === "string" && o.extension_id) return o.extension_id;
+  return extensionIdFrom(o.extension) ?? extensionIdFrom(o.data);
+}
+
+/** Retire le secret hash d'une extension avant mise en cache et affichage. */
+function withoutSecret(ext: OneStockExtension): OneStockExtension {
+  return Object.fromEntries(Object.entries(ext).filter(([k]) => !SECRET_FIELD.test(k))) as OneStockExtension;
 }
 
 /** Supprime l'extension de l'environnement : `DELETE {url}/extensions/{id}` avec `{ site_id, token }`. */

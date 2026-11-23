@@ -4,7 +4,8 @@ import ConfirmButton from "@/components/ConfirmButton";
 import HiddenContext from "@/components/HiddenContext";
 import { Alert, Empty, Icon, Modal } from "@/components/ui";
 import { withContext } from "@/lib/context";
-import ApiExtensionDetails from "@/components/ApiExtensionDetails";
+import ApiExtensionDetails, { secretLabels } from "@/components/ApiExtensionDetails";
+import SecretReveal from "@/components/SecretReveal";
 import ExtensionForm, { type ExtensionFormValues } from "@/components/ExtensionForm";
 import { nameKey, readCatalog, type Extension } from "@/lib/db";
 import { formatDate, getT, type MessageKey } from "@/lib/i18n";
@@ -234,7 +235,16 @@ export default async function ExtensionsPage({ searchParams }: { searchParams: P
         <Alert type="success">
           {t(`ext.done.${params.done}` as MessageKey, { name: params.name ?? "" })}
           {params.done === "installed" && params.copied !== undefined && (
-            <> {t("ext.copiedSettings", { n: params.copied, site: siteId })}</>
+            <> {t("ext.copiedSettings", { n: params.copied, site: siteId })}
+          {params.done === "installed" && params.os_id && (
+            <div style={{ marginTop: 6 }}>
+              {params.secret === "saved" ? t("secret.saved") : t("secret.notReturned")}{" "}
+              <SecretReveal
+                ctx={{ site_id: params.site_id, parent_url: params.parent_url, api_url: params.api_url, os_id: params.os_id }}
+                labels={secretLabels(t)}
+              />
+            </div>
+          )}</>
           )}
         </Alert>
       )}
